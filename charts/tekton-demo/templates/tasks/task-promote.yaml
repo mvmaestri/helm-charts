@@ -70,20 +70,6 @@ spec:
         | sed 's/[",]//g')        
         before=$(echo -e $before)
 
-        ls -ls /etc/idrsa/
-        touch ~/.ssh/config
-        ssh-add /etc/idrsa/ssh-privatekey
-        # chmod 400 ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/config
-        tee -a ~/.ssh/config << END
-        host github.com
-          HostName github.com
-          IdentitiesOnly yes
-          IdentityFile /etc/idrsa/ssh-privatekey
-          User git
-        END
-        ssh-keyscan github.com >> ~/.ssh/known_hosts
-
         git config --global user.name  "$(params.author)"
         git config --global user.email "$(params.email)"
         git remote set-url origin "git@github.com:{{ .Values.pipeline.webhook.github.org }}/{{ .Values.pipeline.webhook.github.repo }}.git"

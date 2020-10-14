@@ -103,7 +103,13 @@ Assuming your private key was created in the default location `$HOME/.ssh/id_rsa
 
     oc create secret generic github-deploy-secret \
         --from-file=ssh-privatekey=$HOME/.ssh/id_rsa \
+        --type=kubernetes.io/ssh-auth \
         --namespace labs-ci-cd
+
+And then annotate with tekton.dev spec
+
+    oc annotate --namespace labs-ci-cd --overwrite secret/github-deploy-secret "tekton.dev/git-0=https://github.com" 
+
 
 ### Applying
 
