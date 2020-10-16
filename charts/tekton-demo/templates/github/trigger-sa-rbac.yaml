@@ -47,4 +47,4 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: tekton-triggers-role
+  name: {{ .Values.application.name }}tekton-triggers-role
