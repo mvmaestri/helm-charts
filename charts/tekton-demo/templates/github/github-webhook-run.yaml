@@ -24,4 +24,4 @@ spec:
     - name: ExternalDomain
       value: http://{{ .Values.application.name }}-trigger-{{ .Values.application.environments.cicd }}.{{ .Values.cluster }}
 
-  serviceAccountName: tekton-triggers-createwebhook
+  serviceAccountName: {{ .Values.application.nam }}-tekton-triggers-createwebhook
