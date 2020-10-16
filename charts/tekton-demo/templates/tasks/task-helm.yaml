@@ -45,8 +45,12 @@ spec:
       script: |
         #!/bin/sh
           ls -ls
-          ./helm lint chart
-          ./helm template -f chart/values.yaml chart
+          if [ -d "chart" ]; then
+            ./helm lint chart
+            ./helm template -f chart/values.yaml chart
+          else
+            echo "Chart does not exist"
+          fi
       securityContext:
         runAsUser: 0
 
