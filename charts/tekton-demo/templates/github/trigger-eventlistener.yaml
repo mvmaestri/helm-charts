@@ -19,7 +19,7 @@ spec:
             # - key: extensions.branch_name
             #   expression: "body.ref.split('/')[2]"
       bindings:
-      - name: trigger-binding
+      - name: {{ .Values.application.name }}-trigger-binding
       template:
         name: {{ .Values.application.name }}-trigger-template
 
@@ -31,7 +31,7 @@ spec:
             - key: extensions.truncated_sha
               expression: "body.pull_request.head.sha.truncate(7)"
       bindings:
-      - name: trigger-binding
+      - name: {{ .Values.application.name }}-trigger-binding
       template:
         name: {{ .Values.application.name }}-trigger-template
 ---
