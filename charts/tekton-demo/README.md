@@ -101,9 +101,7 @@ In order to avoid using passwords to publish new content on Github, we will use 
 
 Assuming your private key was created in the default location `$HOME/.ssh/id_rsa`, you can run the command below to create a generic secret.
 
-    oc create secret generic github-deploy-secret \
-        --from-file=ssh-privatekey=$HOME/.ssh/id_rsa \
-        --namespace labs-ci-cd
+oc create secret generic github-webhook-secret --from-literal=token=XXXXXXX -n labs-ci-cd
 
 ### Applying
 

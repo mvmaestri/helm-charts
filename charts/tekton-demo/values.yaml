@@ -20,5 +20,5 @@ pipeline:
       org: mvmaestri
       user: mvmaestri
       repo: do101-apps
-      secret: github-webhook-secret
-      key: github-deploy-secret
+      secret: treo-github-webhook-secret
+      key: treo-github-deploy-secret

@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1alpha1
 kind: Task
 metadata:
-  name: helm
+  name: {{ .Values.application.name }}-helm
   namespace: {{ .Values.application.environments.cicd }}
 spec:
   params:

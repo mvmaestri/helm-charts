@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1alpha1
 kind: Task
 metadata:
-  name: test-performance
+  name: {{ .Values.application.name }}-test-performance
   namespace: {{ .Values.application.environments.cicd }}
 spec:
   params:

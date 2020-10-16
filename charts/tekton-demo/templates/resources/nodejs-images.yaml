@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Values.application.environments.cicd }}
 subjects:
 - kind: ServiceAccount
-  name: {{ .Values.pipeline.sa.default }}
+  name: {{ .Values.pipeline.sa.triggers }}
   namespace: {{ .Values.application.environments.cicd }}
 roleRef:
   kind: ClusterRole

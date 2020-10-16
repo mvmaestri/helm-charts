@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1alpha1
 kind: Task
 metadata:
-  name: create-webhook
+  name: {{ .Values.application.name }}-create-webhook
   namespace: {{ .Values.application.environments.cicd }}
 spec:
   params:

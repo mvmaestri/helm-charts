@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1alpha1
 kind: Task
 metadata:
-  name: test-integration
+  name: {{ .Values.application.name }}-test-integration
   namespace: {{ .Values.application.environments.cicd }}
 spec:
   params:

@@ -36,7 +36,7 @@ spec:
     - name: info
       taskRef:
         kind: Task
-        name: status
+        name: {{ .Values.application.name }}-status
       resources:       
         inputs:
           - name: source
@@ -57,7 +57,7 @@ spec:
 
     - name: prepare
       taskRef:
-        name: prepare
+        name: {{ .Values.application.name }}-prepare
       runAfter:
         - info
       params:
@@ -80,7 +80,7 @@ spec:
 
     - name: helm
       taskRef:
-        name: helm
+        name: {{ .Values.application.name }}-helm
       runAfter:
         - info
       params:
@@ -103,7 +103,7 @@ spec:
 
     - name: standards
       taskRef:
-        name: standards
+        name: {{ .Values.application.name }}-standards
       runAfter:
         - info
       params:
@@ -126,7 +126,7 @@ spec:
 
     - name: docs
       taskRef:
-        name: docs
+        name: {{ .Values.application.name }}-docs
       runAfter:
         - info
       params:
@@ -154,7 +154,7 @@ spec:
 
     - name: build
       taskRef:
-        name: build
+        name: {{ .Values.application.name }}-build
       runAfter:
         - info
       params:
@@ -182,7 +182,7 @@ spec:
 
     - name: deploy
       taskRef:
-        name: deploy
+        name: {{ .Values.application.name }}-deploy
       runAfter:
         - prepare
         - helm
@@ -211,7 +211,7 @@ spec:
 
     - name: test-stress
       taskRef:
-        name: test-performance
+        name: {{ .Values.application.name }}-test-performance
       runAfter:
         - deploy
       params:
@@ -230,7 +230,7 @@ spec:
 
     - name: test-e2e
       taskRef:
-        name: test-integration
+        name: {{ .Values.application.name }}-test-integration
       runAfter:
         - deploy
       params:
@@ -253,12 +253,12 @@ spec:
 
     - name: apply
       conditions:
-        - conditionRef: is-allowed-production
+        - conditionRef: {{ .Values.application.name }}-is-allowed-production
           params:
             - name: revision-type
               value: $(tasks.info.results.revision-type)
       taskRef:
-        name: apply
+        name: {{ .Values.application.name }}-apply
       runAfter:
         - test-e2e
         - test-stress
@@ -280,15 +280,14 @@ spec:
           - name: source
             resource: {{ .Values.application.name }}-git
 
-
     - name: promote
       conditions:
-        - conditionRef: is-allowed-production
+        - conditionRef: {{ .Values.application.name }}-is-allowed-production
           params:
             - name: revision-type
               value: $(tasks.info.results.revision-type)
       taskRef:
-        name: promote
+        name: {{ .Values.application.name }}-promote
       runAfter:
         - apply
       params:
@@ -323,7 +322,7 @@ spec:
     - name: release
       taskRef:
         kind: Task
-        name: tag
+        name: {{ .Values.application.name }}-tag
       runAfter:
         - promote
       params:

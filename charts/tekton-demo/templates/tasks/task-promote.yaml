@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1alpha1
 kind: Task
 metadata:
-  name: promote
+  name: {{ .Values.application.name }}-promote
   namespace: {{ .Values.application.environments.cicd }}
 spec:
   params:
@@ -151,7 +151,6 @@ spec:
           oc create route edge --service $appname --port 8080 --hostname $hostname -n {{ .Values.application.environments.production }}
           sleep 5
           oc patch svc/$appname -p '{ "spec": {"type":"LoadBalancer"}}, { "ports": [ { "name": "gw", "protocol": "TCP", "port": 8080,"targetPort": 8080 } ] } }' -n {{ .Values.application.environments.production }}
-          # oc expose svc/nodejs-tekton-release-1-2-0 -n nodejs-tekton-production
         else
           echo "Route is already available."
           echo $hostname

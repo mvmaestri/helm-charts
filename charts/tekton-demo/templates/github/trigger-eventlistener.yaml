@@ -5,7 +5,7 @@ metadata:
   name: {{ .Values.application.name }}
   namespace: {{ .Values.application.environments.cicd }}
 spec:
-  serviceAccountName: {{ .Values.pipeline.sa.default }}
+  serviceAccountName: {{ .Values.pipeline.sa.triggers }}
   triggers:
     - name: github-event-push
       interceptors:

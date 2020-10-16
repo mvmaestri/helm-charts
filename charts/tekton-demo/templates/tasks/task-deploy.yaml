@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1alpha1
 kind: Task
 metadata:
-  name: deploy
+  name: {{ .Values.application.name }}-deploy
   namespace: {{ .Values.application.environments.cicd }}
 spec:
   params:
