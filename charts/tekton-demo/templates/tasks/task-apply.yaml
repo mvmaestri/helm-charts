@@ -29,7 +29,7 @@ spec:
 
   steps:
     - name: helm-prepare
-      image: ubi8/nodejs-10
+      image: ubi8/nodejs-12
       resources: {}
       workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
       script: |

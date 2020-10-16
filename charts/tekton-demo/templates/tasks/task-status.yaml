@@ -76,7 +76,7 @@ spec:
         echo "Revision-name:" $(cat /tekton/results/revision-name)
 
     - name: validate
-      image: ubi8/nodejs-10
+      image: ubi8/nodejs-12
       resources: {}
       workingDir: /workspace/source
       script: |
@@ -114,7 +114,7 @@ spec:
         echo OK
 
     # - name: debug
-    #   image: ubi8/nodejs-10
+    #   image: ubi8/nodejs-12
     #   workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
     #   command: ["/bin/bash", "-c"]
     #   args:

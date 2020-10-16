@@ -26,20 +26,24 @@ spec:
         type: git
   steps:
     - name: helm-prepare
-      image: ubi8/nodejs-10
+      image: ubi8/nodejs-12
       resources: {}
       workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
       script: |
         #!/bin/sh
-          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
-          chmod 700 get_helm.sh
-          ./get_helm.sh
-          cp /usr/local/bin/helm /workspace/source/{{ .Values.pipeline.build.s2i.context }}
+          if [ -d "chart" ]; then
+            curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+            chmod 700 get_helm.sh
+            ./get_helm.sh
+            cp /usr/local/bin/helm /workspace/source/{{ .Values.pipeline.build.s2i.context }}
+          else
+            echo "Chart does not exist"
+          fi
       securityContext:
         runAsUser: 0
 
     - name: chart-lint
-      image: ubi8/nodejs-10
+      image: ubi8/nodejs-12
       resources: {}
       workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
       script: |

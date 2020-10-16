@@ -41,7 +41,7 @@ spec:
 
   steps:
     - name: validate
-      image: ubi8/nodejs-10
+      image: ubi8/nodejs-12
       resources: {}
       workingDir: /workspace/source
       script: |
@@ -55,7 +55,7 @@ spec:
         fi
 
     - name: release-notes
-      image: ubi8/nodejs-10
+      image: ubi8/nodejs-12
       workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
       volumeMounts:
         - name: {{ .Values.pipeline.webhook.github.key }}
@@ -249,7 +249,7 @@ spec:
           oc set triggers deployment/$appname -n {{ .Values.application.environments.production }}
 
     - name: pull-request
-      image: ubi8/nodejs-10
+      image: ubi8/nodejs-12
       resources: {}
       workingDir: /workspace/source
       script: |
