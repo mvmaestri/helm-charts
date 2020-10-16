@@ -67,10 +67,13 @@ spec:
       image: ubi8/nodejs-12
       resources: {}
       workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
-      command: ["/bin/bash", "-c"]
-      args:
-        - |-
-          npm run test-unit
+      script: |
+        #!/bin/sh
+          if [[ $(npm run | grep "^  test-unit" | wc -l) == "1" ]]; then
+            npm run test-unit
+          else
+            echo "Not implemented (npm run test-unit)"
+          fi
       securityContext:
         runAsUser: 0
 
@@ -80,7 +83,11 @@ spec:
       workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
       script: |
         #!/bin/sh
-        npm run coverage
+          if [[ $(npm run | grep "^  coverage" | wc -l) == "1" ]]; then
+            npm run coverage
+          else
+            echo "Not implemented (npm run coverage)"
+          fi
       securityContext:
         runAsUser: 0
 
