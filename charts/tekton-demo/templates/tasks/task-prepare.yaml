@@ -112,5 +112,3 @@ spec:
   volumes:
     - name: varlibcontainers
       emptyDir: {}
-    - name: gen-source
-      emptyDir: {}

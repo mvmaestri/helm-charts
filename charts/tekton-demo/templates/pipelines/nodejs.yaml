@@ -37,7 +37,7 @@ spec:
       taskRef:
         kind: Task
         name: {{ .Values.application.name }}-status
-      resources:       
+      resources:
         inputs:
           - name: source
             resource: {{ .Values.application.name }}-git

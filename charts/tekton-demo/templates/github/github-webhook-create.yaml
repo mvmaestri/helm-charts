@@ -54,7 +54,7 @@ spec:
       fi
 
   - name: create-deployment-key
-    image: ubi8/nodejs-10
+    image: ubi8/nodejs-12
     volumeMounts:
     - name: {{ .Values.pipeline.webhook.github.secret }}
       mountPath: /var/secret
