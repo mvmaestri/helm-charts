@@ -1,9 +1,13 @@
+{{ $application := default dict .Values.application }}
+{{ $pipeline := default dict .Values.pipeline }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
-  name: {{ .Values.application.name }}-trigger-template
-  namespace: {{ .Values.application.environments.cicd }}
+  name: {{ $application.name }}-trigger-template-{{ $repo.name }}
+  namespace: {{ $application.environments.cicd }}
 spec:
   # description: >-
   #   This `task` consumes data from the trigger binding file and fires a new pipelinerun with a pipeline as reference.
@@ -29,19 +33,19 @@ spec:
     kind: PipelineRun
     metadata:
       generateName: $(params.reponame)-$(params.author)-
-      namespace: {{ .Values.application.environments.cicd }}
+      namespace: {{ $application.environments.cicd }}
       labels:
         webhooks.tekton.dev/repo: $(params.reponame)
         webhooks.tekton.dev/author: $(params.author)
       annotations:
         argocd.argoproj.io/compare-options: IgnoreExtraneous
     spec:
-      serviceAccountName: {{ .Values.pipeline.sa.triggers }}
+      serviceAccountName: {{ $pipeline.sa.triggers }}
       workspaces:
-          - name: {{ .Values.application.name }}-source
+          - name: {{ $application }}-{{ $repo.name }}-source
             persistentVolumeClaim:
-              claimName: {{ .Values.application.name }}-pvc
-          - name: {{ .Values.application.name }}-shared
+              claimName: {{ $application }}-{{ $repo.name }}-pvc
+          - name: {{ $application }}-{{ $repo.name }}-shared
             volumeClaimTemplate:
               spec:
                 accessModes:
@@ -65,9 +69,10 @@ spec:
         - name: repofullname
           value: $(params.repofullname)
       pipelineRef:
-        name: {{ .Values.application.name }}
+        name: {{ $application }}
       resources:
-        - name: {{ .Values.application.name }}-git
+        - name: {{ $application }}-{{ $repo.name }}-git
+          # todo: replace images per repo
           resourceSpec:
             type: git
             params:
@@ -75,12 +80,14 @@ spec:
                 value: $(params.repourl)
               - name: revision
                 value: $(params.revision)
-        - name: {{ .Values.application.name }}-development
+        - name: {{ $application }}-development
           resourceRef:
-            name: {{ .Values.application.name }}-development
-        - name: {{ .Values.application.name }}-production
+            name: {{ $application }}-development
+        - name: {{ $application }}-production
           resourceRef:
-            name: {{ .Values.application.name }}-production
-        - name: {{ .Values.application.name }}-documentation
+            name: {{ $application }}-production
+        - name: {{ $application.name }}-documentation
           resourceRef:
-            name: {{ .Values.application.name }}-documentation
+            name: {{ $application.name }}-documentation
+{{- end }}
+{{- end }}

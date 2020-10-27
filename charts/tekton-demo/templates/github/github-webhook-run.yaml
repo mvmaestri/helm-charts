@@ -1,25 +1,31 @@
+{{ $application := default dict .Values.application }}
+{{ $cluster := default dict .Values.cluster }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
 ---
 apiVersion: tekton.dev/v1beta1
 kind: TaskRun
 metadata:
-  name: create-{{ .Values.application.name }}-github-webhook
-  namespace: {{ .Values.application.environments.cicd }}
+  name: create-{{ $application.name }}-{{ $repo.name }}-github-webhook
+  namespace: {{ $application.environments.cicd }}
 spec:
-  serviceAccountName: tekton-triggers-createwebhook
+  serviceAccountName: {{ $repo.name }}-tekton-triggers-createwebhook
   taskRef:
-    name: {{ .Values.application.name }}-create-webhook
+    name: {{ $application.name }}-{{ $repo.name }}-create-webhook
   params:
   - name: GitHubOrg
-    value: {{ .Values.pipeline.webhook.github.org }}
+    value: {{ $repo.org }}
   - name: GitHubUser
-    value: {{ .Values.pipeline.webhook.github.user }}
+    value: {{ $repo.user }}
   - name: GitHubRepo
-    value: {{ .Values.pipeline.webhook.github.repo }}
+    value: {{ $repo.repo }}
   - name: GitHubSecretName
-    value: {{ .Values.pipeline.webhook.github.secret }}
+    value: {{ $repo.secret }}
   - name: GitHubAccessTokenKey
     value: password
   - name: GitHubSecretStringKey
     value: secret
   - name: ExternalDomain
-    value: http://{{ .Values.application.name }}-trigger-{{ .Values.application.environments.cicd }}.{{ .Values.cluster }}
+    value: http://{{ $application.name }}-trigger-{{ $application.environments.cicd }}.{{ $cluster }}
+{{- end }}
+{{- end }}

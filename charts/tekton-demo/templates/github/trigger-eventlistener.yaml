@@ -1,20 +1,24 @@
+{{ $application := default dict .Values.application }}
+{{ $pipeline := default dict .Values.pipeline }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: EventListener
 metadata:
-  name: {{ .Values.application.name }}
-  namespace: {{ .Values.application.environments.cicd }}
+  name: {{ $application.name }}-{{ $repo.name }}
+  namespace: {{ $application.environments.cicd }}
 spec:
-  serviceAccountName: {{ .Values.pipeline.sa.triggers }}
+  serviceAccountName: {{ $pipeline.sa.triggers }}
   triggers:
     - name: cel-trig-with-canonical
       interceptors:
         - cel:
             filter: "header.canonical('X-GitHub-Event') == 'push'"
       bindings:
-        - ref: {{ .Values.application.name }}-trigger-binding
+        - ref: {{ $application.name }}-{{ $repo.name }}-trigger-binding
       template:
-        name: {{ .Values.application.name }}-trigger-template
+        name: {{ $application.name }}-{{ $repo.name }}-trigger-template
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -22,14 +26,16 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: EventListener
     app.kubernetes.io/part-of: Triggers
-    eventlistener: {{ .Values.application.name }}
-  name: {{ .Values.application.name }}-trigger
-  namespace: {{ .Values.application.environments.cicd }}
+    eventlistener: {{ $application.name }}-{{ $repo.name }}
+  name: {{ $application.name }}-trigger-{{ $repo.name }}
+  namespace: {{ $application.environments.cicd }}
 spec:
   port:
     targetPort: http-listener
   to:
     kind: Service
-    name: el-{{ .Values.application.name }}
+    name: el-{{ $application.name }}-{{ $repo.name }}
     weight: 100
   wildcardPolicy: None
+{{- end }}
+{{- end }}

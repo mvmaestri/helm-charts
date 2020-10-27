@@ -1,9 +1,12 @@
+{{ $application := default dict .Values.application }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerBinding
 metadata:
-  name: {{ .Values.application.name }}-trigger-binding
-  namespace: {{ .Values.application.environments.cicd }}
+  name: {{ $application.name }}-{{ $repo.name }}-trigger-binding
+  namespace: {{ $application.environments.cicd }}
 spec:
   # description: >-
   #   This `task` can be used to transport github webhook payload into the trigger template file.
@@ -24,3 +27,5 @@ spec:
     value: $(body.head_commit.author.username)
   - name: email
     value: $(body.head_commit.author.email)
+{{- end }}
+{{- end }}
