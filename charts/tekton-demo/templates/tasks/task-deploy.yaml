@@ -1,8 +1,13 @@
+{{ $application := default dict .Values.application }}
+{{ $cluster := default dict .Values.cluster }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
+---
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: deploy
-  namespace: {{ .Values.application.environments.cicd }}
+  name: {{ $repo.id }}-deploy
+  namespace: {{ $application.environments.cicd }}
 spec:
   params:
     - name: cluster
@@ -31,16 +36,16 @@ spec:
         if [ "$(inputs.params.revision-type)" == "feature" ] || [ "$(inputs.params.revision-type)" == "develop" ]; then
           replace=$(inputs.params.revision-name)
           revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
+          appname={{ $application.name }}-$(inputs.params.revision-type)-$revisionName
 
           if [ "$(inputs.params.revision-type)" == "develop" ]; then
             # overwrite develop name structure
-            appname={{ .Values.application.name }}-$revisionName
+            appname={{ $application.name }}-$revisionName
           fi
 
-          oc get deployment/$appname -n {{ .Values.application.environments.development }}
+          oc get deployment/$appname -n {{ $application.environments.development }}
           if [[ $? -ne 0 ]]; then
-            oc new-app --name=$appname -i={{ .Values.application.name }}-development:$(inputs.params.revision-name) --namespace={{ .Values.application.environments.development }} --labels=app.name={{ .Values.application.name }}
+            oc new-app --name=$appname -i={{ $application.name }}-development:$(inputs.params.revision-name) --namespace={{ $application.environments.development }} --labels=app.name={{ $application.name }}
           else
             echo "Application already exists."
           fi
@@ -57,11 +62,11 @@ spec:
         if [ "$(inputs.params.revision-type)" == "develop" ]; then
           replace=$(inputs.params.revision-name)
           revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-documentation
+          appname={{ $application.name }}-documentation
 
-          oc get deployment/$appname -n {{ .Values.application.environments.development }}
+          oc get deployment/$appname -n {{ $application.environments.development }}
           if [[ $? -ne 0 ]]; then
-            oc new-app --name=$appname -i={{ .Values.application.name }}-documentation:$(inputs.params.revision-name) --namespace={{ .Values.application.environments.development }} --labels=app.name={{ .Values.application.name }}
+            oc new-app --name=$appname -i={{ $application.name }}-documentation:$(inputs.params.revision-name) --namespace={{ $application.environments.development }} --labels=app.name={{ $application.name }}
           else
             echo "Application already exists."
           fi
@@ -78,46 +83,44 @@ spec:
         if [ "$(inputs.params.revision-type)" == "feature" ] || [ "$(inputs.params.revision-type)" == "develop" ]; then
           replace=$(inputs.params.revision-name)
           revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-          hostname=$(inputs.params.revision-type)-$revisionName-{{ .Values.application.environments.development }}.{{ .Values.cluster }}
+          appname={{ $application.name }}-$(inputs.params.revision-type)-$revisionName
+          hostname=$(inputs.params.revision-type)-$revisionName-{{ $application.environments.development }}.{{ $cluster }}
 
           if [ "$(inputs.params.revision-type)" == "develop" ]; then
             # overwrite appname structure
-            appname={{ .Values.application.name }}-$revisionName
+            appname={{ $application.name }}-$revisionName
             # overwrite hostname
-            hostname=$revisionName-{{ .Values.application.environments.development }}.{{ .Values.cluster }}
+            hostname=$revisionName-{{ $application.environments.development }}.{{ $cluster }}
             
             # documentation development route
-            documentation={{ .Values.application.name }}-documentation-{{ .Values.application.environments.development }}.{{ .Values.cluster }}
-            oc get route/{{ .Values.application.name }}-documentation -n {{ .Values.application.environments.development }}
+            documentation={{ $application.name }}-documentation-{{ $application.environments.development }}.{{ $cluster }}
+            oc get route/{{ $application.name }}-documentation -n {{ $application.environments.development }}
             if [[ $? -ne 0 ]]; then
               echo "Exposing"
-              oc create route edge --service {{ .Values.application.name }}-documentation --port 8080 --hostname $documentation -n {{ .Values.application.environments.development }}
+              oc create route edge --service {{ $application.name }}-documentation --port 8080 --hostname $documentation -n {{ $application.environments.development }}
             else
               echo "Documentation is already exposed."
               echo $documentation
               echo ""
             fi
-
-
           fi
 
-          oc get svc/$appname -n {{ .Values.application.environments.development }}
+          oc get svc/$appname -n {{ $application.environments.development }}
           if [[ $? -ne 0 ]]; then
             echo "Exposing"
-            oc expose svc/$appname -n {{ .Values.application.environments.development }}
+            oc expose svc/$appname -n {{ $application.environments.development }}
           else
             echo "Application is already exposed."
             echo $hostname
             echo ""
           fi
 
-          oc get route/$appname -n {{ .Values.application.environments.development }}
+          oc get route/$appname -n {{ $application.environments.development }}
           if [[ $? -ne 0 ]]; then
             echo "Creating routes"
-            oc create route edge --service $appname --port 8080 --hostname $hostname -n {{ .Values.application.environments.development }}
+            oc create route edge --service $appname --port 8080 --hostname $hostname -n {{ $application.environments.development }}
             sleep 5
-            oc patch svc/$appname -p '{ "spec": {"type":"LoadBalancer"}}, { "ports": [ { "name": "gw", "protocol": "TCP", "port": 8080,"targetPort": 8080 } ] } }' -n {{ .Values.application.environments.development }}
+            oc patch svc/$appname -p '{ "spec": {"type":"LoadBalancer"}}, { "ports": [ { "name": "gw", "protocol": "TCP", "port": 8080,"targetPort": 8080 } ] } }' -n {{ $application.environments.development }}
           else
             echo ""
             echo "Route is already available."
@@ -137,14 +140,13 @@ spec:
 
           replace=$(inputs.params.revision-name)
           revisionName=${replace//./-} # replace . to / 
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
+          appname={{ $application.name }}-$(inputs.params.revision-type)-$revisionName
 
           if [ "$(inputs.params.revision-type)" == "develop" ]; then
             # overwrite appname structure
-            appname={{ .Values.application.name }}-$revisionName
+            appname={{ $application.name }}-$revisionName
           fi
         
-
         else
           echo "Branch type $(inputs.params.revision-type) does not deploy to development"
           exit 0
@@ -156,14 +158,14 @@ spec:
         #!/bin/sh
         replace=$(inputs.params.revision-name)
         revisionName=${replace//./-}
-        appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-        environment={{ .Values.application.environments.development }}
+        appname={{ $application.name }}-$(inputs.params.revision-type)-$revisionName
+        environment={{ $application.environments.development }}
         
         if [ "$(inputs.params.revision-type)" == "feature" ] || [ "$(inputs.params.revision-type)" == "develop" ]; then
 
           if [ "$(inputs.params.revision-type)" == "develop" ]; then
             # overwrite appname structure
-            appname={{ .Values.application.name }}-$revisionName
+            appname={{ $application.name }}-$revisionName
             oc set env deployment/$appname --overwrite version=$(inputs.params.revision-short) -n $environment
           else
             oc set env deployment/$appname --overwrite revision-id=$(inputs.params.revision-short) -n $environment
@@ -187,21 +189,22 @@ spec:
 
           replace=$(inputs.params.revision-name)
           revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
+          appname={{ $application.name }}-$(inputs.params.revision-type)-$revisionName
 
           if [ "$(inputs.params.revision-type)" == "develop" ]; then
             # overwrite appname structure
-            appname={{ .Values.application.name }}-$revisionName
+            appname={{ $application.name }}-$revisionName
           fi
 
-          oc set probe deployment/$appname --remove --readiness --liveness -n {{ .Values.application.environments.development }}
-          oc set probe deployment/$appname --readiness --get-url=http://:8080/ --initial-delay-seconds=30 -n {{ .Values.application.environments.development }}
+          oc set probe deployment/$appname --remove --readiness --liveness -n {{ $application.environments.development }}
+          oc set probe deployment/$appname --readiness --get-url=http://:8080/ --initial-delay-seconds=30 -n {{ $application.environments.development }}
 
         else
           echo "Branch type $(inputs.params.revision-type) does not deploy to development"
           exit 0
         fi
 
+    {{- if not $repo.tasks.deploy.skip.autoscale }}
     - name: app-autoscale
       image: registry.redhat.io/openshift4/ose-cli:latest
       script: |
@@ -211,12 +214,12 @@ spec:
         revisionName=${replace//./-}
 
         if [ "$(inputs.params.revision-type)" == "develop" ]; then
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)
+          appname={{ $application.name }}-$(inputs.params.revision-type)
           min=1
           max=10
           threshold=50
         elif [ "$(inputs.params.revision-type)" == "feature" ]; then
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
+          appname={{ $application.name }}-$(inputs.params.revision-type)-$revisionName
           min=1
           max=2
           threshold=75
@@ -224,15 +227,16 @@ spec:
 
         if [ "$(inputs.params.revision-type)" == "feature" ] || [ "$(inputs.params.revision-type)" == "develop" ]; then
 
-          oc get hpa $appname -n {{ .Values.application.environments.development }}
+          oc get hpa $appname -n {{ $application.environments.development }}
           if [[ $? -ne 0 ]]; then
             oc autoscale deployment $appname \
               --min $min --max $max --cpu-percent=$threshold \
-              --namespace {{ .Values.application.environments.development }}
+              --namespace {{ $application.environments.development }}
           else
             echo "Application autoscale is already configured."
           fi
         fi
+    {{- end }}
 
     - name: app-triggers
       image: registry.redhat.io/openshift4/ose-cli:latest
@@ -242,16 +246,19 @@ spec:
 
           replace=$(inputs.params.revision-name)
           revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
+          appname={{ $application.name }}-$(inputs.params.revision-type)-$revisionName
 
           if [ "$(inputs.params.revision-type)" == "develop" ]; then
             # overwrite appname structure
-            appname={{ .Values.application.name }}-$revisionName
+            appname={{ $application.name }}-$revisionName
           fi
 
-          oc set triggers deployment/$appname -n {{ .Values.application.environments.development }}
+          oc set triggers deployment/$appname -n {{ $application.environments.development }}
 
         else
           echo "Branch type $(inputs.params.revision-type) does not deploy to development"
           exit 0
         fi
+
+{{- end }}
+{{- end }}

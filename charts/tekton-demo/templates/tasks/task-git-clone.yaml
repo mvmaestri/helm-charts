@@ -78,6 +78,8 @@ spec:
       type: string
     - name: pipelinerun
       type: string
+    - name: context
+      type: string
   results:
     - name: commit
       description: The precise commit SHA that was fetched by this Task
@@ -164,7 +166,6 @@ spec:
         cluster=$(echo "apps."${server//https:\/\/api./})
         cluster=${cluster//:6443/}
         echo $cluster
-
         echo $(params.ref)
         echo $(params.revision)
         echo $(params.author)
@@ -183,6 +184,7 @@ spec:
         echo "Revision-type:" $(cat /tekton/results/revision-type)
         echo "Revision-name:" $(cat /tekton/results/revision-name)
 
+
     - name: validate
       image: registry.redhat.io/rhel8/nodejs-12
       resources: {}
@@ -194,7 +196,7 @@ spec:
         revisionType=$(cat /tekton/results/revision-type)
         revisionName=$(cat /tekton/results/revision-name)
         printf %s "$(git rev-parse --short HEAD)" >> /tekton/results/revision-short
-        package={{ .Values.pipeline.build.s2i.context }}/package.json
+        package=$(params.context)/package.json
         git fetch --all --tags > /dev/null 2>&1
         if git rev-parse -q --verify "refs/tags/$revisionName" >/dev/null; then
             echo "Tag $revisionName already exists"
@@ -202,6 +204,7 @@ spec:
         fi
 
         if [ ! -f $package ]; then
+            ls -ls
             echo "Missing package.json"
             exit 1 
         fi

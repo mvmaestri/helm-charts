@@ -1,6 +1,7 @@
 cluster: apps.s45.core.rht-labs.com
 registry:
   secret: 11009103-tekton-pipeline-pull-secret
+
 application:
   name: do101
   runtime: nodejs:12
@@ -8,6 +9,7 @@ application:
     cicd: labs-ci-cd
     development: do101-development
     production: do101-production
+
 pipeline:
   sa:
     default: pipeline
@@ -16,7 +18,7 @@ pipeline:
     host: https://nexus-labs-ci-cd.apps.s45.core.rht-labs.com/repository/labs-npm
   build:
     s2i:
-      context: weather
+      context: .
 
   webhook:
     github:
@@ -25,3 +27,72 @@ pipeline:
       repo: do101-apps
       secret: do101-github-webhook-secret
       key: do101-github-deploy-secret
+
+config:
+  build:
+    strategy:
+      buildah: registry.redhat.io/rhel8/buildah
+  deployment:
+    strategy:
+      matchVersion: false
+      latest: 
+        from: develop
+
+repositories:
+  - id: backend
+    name: do101-apps
+    org: mvmaestri
+    user: mvmaestri
+    url: github.com/mvmaestri/do101-apps.git # check for orgs
+    secret: do101-github-webhook-secret # todo: override if does not exists
+    key: do101-github-deploy-secret
+    tasks:
+      validate:
+        fileExists:
+          - package.json
+      standards:
+        skip:
+          helm: true
+          lint: true
+          unit: true
+          coverage: true
+      build:
+        runtime: registry.redhat.io/rhel8/nodejs-12
+        context: weather
+      deploy:
+        skip:
+          autoscale: true
+      tests:
+        e2e: 
+          skip: false
+          command: npm run e2e
+        stress: true
+
+  - id: frontend
+    name: treo
+    runtime: registry.redhat.io/rhel8/nodejs-12
+    org: mvmaestri
+    user: mvmaestri
+    secret: do101-github-webhook-secret
+    key: do101-github-deploy-secret
+    tasks:
+      validate:
+        fileExists:
+          - package.json
+      standards:
+        skip: 
+          helm: true
+          audit: true
+          coverage: true
+      build:
+        runtime: registry.redhat.io/rhel8/nodejs-12
+        command: npm run build
+        context: .
+      deploy:
+        skip:
+          autoscale: true
+      tests:
+        e2e: 
+          skip: false
+          command: npm run e2e
+        stress: true

@@ -6,7 +6,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: {{ $application.name }}-{{ $repo.name }}-create-webhook
+  name: {{ $application.name }}-{{ $repo.id }}-create-webhook
   namespace: {{ $application.environments.cicd }}
 spec:
   params:
@@ -39,8 +39,9 @@ spec:
       secretName: {{ $repo.key }}
 
   steps:
-  - name: {{ $repo.name }}-create-webhook
+  - name: {{ $repo.id }}-create-webhook
     image: registry.redhat.io/openshift4/ose-cli:latest
+    resources: {}
     volumeMounts:
     - name: {{ $repo.secret }}
       mountPath: /var/secret
@@ -57,8 +58,9 @@ spec:
         curl -d "{\"name\": \"web\",\"active\": true,\"events\": $(inputs.params.WebhookEvents),\"config\": {\"url\": \"$(inputs.params.ExternalDomain)/\",\"content_type\": \"json\",\"insecure_ssl\": \"1\" ,\"secret\": \"$(cat /var/secret/$(inputs.params.GitHubSecretStringKey))\"}}" -X POST -u $(inputs.params.GitHubUser):$(cat /var/secret/$(inputs.params.GitHubAccessTokenKey)) -L https://$(inputs.params.GitHubDomain)/api/v3/repos/$(inputs.params.GitHubOrg)/$(inputs.params.GitHubRepo)/hooks
       fi
 
-  - name: {{ $repo.name }}-create-deployment-key
+  - name: {{ $repo.id }}-create-deployment-key
     image: registry.redhat.io/rhel8/nodejs-12
+    resources: {}
     volumeMounts:
     - name: {{ $repo.secret }}
       mountPath: /var/secret
@@ -70,7 +72,7 @@ spec:
       curl \
         -i\
         -H"Authorization: token $(cat /var/secret/token)"\
-        --data @- https://api.github.com/repos/{{ $repo.org }}/{{ $repo.repo }}/keys << EOF
+        --data @- https://api.github.com/repos/{{ $repo.org }}/{{ $repo.name }}/keys << EOF
           {
             "title" : "deploymentt $(date)",
             "key" : "$(cat ~/.ssh/id_rsa.pub)",

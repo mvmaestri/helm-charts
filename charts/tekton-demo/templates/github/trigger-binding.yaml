@@ -5,7 +5,7 @@
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerBinding
 metadata:
-  name: {{ $application.name }}-{{ $repo.name }}-trigger-binding
+  name: {{ $application.name }}-{{ $repo.id }}-trigger-binding
   namespace: {{ $application.environments.cicd }}
 spec:
   # description: >-

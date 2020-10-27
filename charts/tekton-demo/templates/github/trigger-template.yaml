@@ -1,12 +1,13 @@
 {{ $application := default dict .Values.application }}
 {{ $pipeline := default dict .Values.pipeline }}
+{{ $repositories := default dict .Values.repositories }}
 {{- if .Values.repositories }}
 {{- range $repo := .Values.repositories }}
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
-  name: {{ $application.name }}-trigger-template-{{ $repo.name }}
+  name: {{ $application.name }}-{{ $repo.id }}-trigger-template
   namespace: {{ $application.environments.cicd }}
 spec:
   # description: >-
@@ -42,17 +43,19 @@ spec:
     spec:
       serviceAccountName: {{ $pipeline.sa.triggers }}
       workspaces:
-          - name: {{ $application }}-{{ $repo.name }}-source
-            persistentVolumeClaim:
-              claimName: {{ $application }}-{{ $repo.name }}-pvc
-          - name: {{ $application }}-{{ $repo.name }}-shared
-            volumeClaimTemplate:
-              spec:
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: 1Gi
+        {{- range $r := $repositories }}
+        - name: {{ $application.name }}-{{ $r.id }}-source
+          persistentVolumeClaim:
+            claimName: {{ $application.name }}-{{ $r.id }}-pvc
+        {{- end }}
+        - name: {{ $application.name }}-shared
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
       params:
         - name: ref
           value: $(params.ref)
@@ -69,9 +72,9 @@ spec:
         - name: repofullname
           value: $(params.repofullname)
       pipelineRef:
-        name: {{ $application }}
+        name: {{ $application.name }}
       resources:
-        - name: {{ $application }}-{{ $repo.name }}-git
+        - name: {{ $application.name }}-git
           # todo: replace images per repo
           resourceSpec:
             type: git
@@ -80,12 +83,12 @@ spec:
                 value: $(params.repourl)
               - name: revision
                 value: $(params.revision)
-        - name: {{ $application }}-development
+        - name: {{ $application.name }}-development
           resourceRef:
-            name: {{ $application }}-development
-        - name: {{ $application }}-production
+            name: {{ $application.name }}-development
+        - name: {{ $application.name }}-production
           resourceRef:
-            name: {{ $application }}-production
+            name: {{ $application.name }}-production
         - name: {{ $application.name }}-documentation
           resourceRef:
             name: {{ $application.name }}-documentation

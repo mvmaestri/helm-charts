@@ -203,7 +203,7 @@ spec:
           max=10
           threshold=50
 
-          oc get hpa $appname -n {{ .Values.application.environments.production }} --ignore-not-found
+          oc get hpa $appname -n {{ .Values.application.environments.production }}
           if [[ $? -ne 0 ]]; then
             oc autoscale deployment $appname \
               --min $min --max $max --cpu-percent=$threshold \

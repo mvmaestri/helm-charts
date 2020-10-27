@@ -1,8 +1,11 @@
+{{ $application := default dict .Values.application }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Values.application.name }}-pvc
+  name: {{ $application.name }}-{{ $repo.id }}-pvc
 spec:
   resources:
     requests:
@@ -10,3 +13,5 @@ spec:
   volumeMode: Filesystem
   accessModes:
     - ReadWriteOnce
+{{- end }}
+{{- end }}
