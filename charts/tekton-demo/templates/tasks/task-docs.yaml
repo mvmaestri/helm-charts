@@ -26,10 +26,6 @@ spec:
       type: string
     - name: author
       description: revision commit author username
-    - name: VERSION
-      description: The version of nodejs
-      default: {{ .Values.application.runtime }}
-      type: string
     - name: TLSVERIFY
       description: Verify the TLS on the registry endpoint (for push/pull to a non-TLS registry)
       default: "false"
