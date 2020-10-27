@@ -1,8 +1,9 @@
+{{ $application := default dict .Values.application }}
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: build-agnostic
-  namespace: {{ .Values.application.environments.cicd }}
+  namespace: {{ $application.environments.cicd }}
   annotations:
     argocd.argoproj.io/compare-options: IgnoreExtraneous
 spec:
@@ -19,14 +20,17 @@ spec:
     - name: revision-name
       description: revision name
       type: string
+    - name: repo-id
+      description: repo id
+      type: string
   workspaces:
     - name: source
 
   results:
   - name: image
     description: url of the image just built
-  - name: digest
-    description: digest of the image just built
+  - name: image-path
+    description: url of the image just built without the registry
     
   steps:
 
@@ -51,7 +55,12 @@ spec:
       script: |
         #!/bin/sh
         ls -ls
-        buildah bud --tls-verify=false --layers -f Dockerfile -t image-registry.openshift-image-registry.svc:5000/{{ .Values.application.environments.development }}/{{ .Values.application.name }}-development:$(inputs.params.revision-name) .
+        registry=image-registry.openshift-image-registry.svc:5000
+        path={{ $application.environments.development }}/$(params.repo-id):$(params.revision-name)
+        image=$registry/$path
+        buildah bud --tls-verify=false --layers -f Dockerfile -t $image .
+        printf %s "$image" >> /tekton/results/image
+        printf %s "$path" >> /tekton/results/image-path
       volumeMounts:
         - name: varlibcontainers
           mountPath: /var/lib/containers
@@ -60,7 +69,11 @@ spec:
 
     - name: image-push
       image: registry.redhat.io/rhel8/buildah
-      command: ['buildah', 'push', '--tls-verify=false', 'image-registry.openshift-image-registry.svc:5000/{{ .Values.application.environments.development }}/{{ .Values.application.name }}-development:$(inputs.params.revision-name)', 'docker://image-registry.openshift-image-registry.svc:5000/{{ .Values.application.environments.development }}/{{ .Values.application.name }}-development:$(inputs.params.revision-name)']
+      resources: {}
+      script: |
+        #!/bin/sh
+        ls -ls
+        buildah push --tls-verify=false $(cat /tekton/results/image) docker://$(cat /tekton/results/image)
       volumeMounts:
         - name: varlibcontainers
           mountPath: /var/lib/containers

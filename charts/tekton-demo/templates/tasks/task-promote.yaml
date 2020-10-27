@@ -1,12 +1,17 @@
+{{ $application := default dict .Values.application }}
+{{ $cluster := default dict .Values.cluster }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
+---
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: promote
-  namespace: {{ .Values.application.environments.cicd }}
+  name: {{ $repo.id }}-promote
+  namespace: {{ $application.environments.cicd }}
 spec:
   workspaces:
-  - name: source
-  - name: shared
+    - name: {{ $repo.id }}-source
+    - name: shared
   params:
     - name: cluster
       description: cluster app url
@@ -32,15 +37,33 @@ spec:
       type: string
     - name: email
       type: string
+    - name: image-path
+      type: string
+  results:
+    - name: deployment
+      description: deployment name
+    - name: hostname
+      description: hostname of the deployed application
+    - name: image-path
+      description: path of production ready image
 
   steps:
     # todo: use when expressions when available
     - name: validate
-      image: registry.redhat.io/rhel8/nodejs-12
+      image: registry.redhat.io/openshift4/ose-cli:latest
       resources: {}
       script: |
         #!/bin/sh
+        replace=$(inputs.params.revision-name)
+        revisionName=${replace//./-}
         revisionType=$(params.revision-type)
+        appname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName
+        hostname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName-{{ $application.environments.production }}.{{ $cluster }}
+        promote={{ $application.environments.production }}/{{ $repo.id }}:$(inputs.params.revision-name)
+        printf %s "$appname" >> /tekton/results/deployment
+        printf %s "$hostname" >> /tekton/results/hostname
+        printf %s "$promote" >> /tekton/results/image-path
+        
         if [ "$revisionType" == "release" ] || [ "$revisionType" = "hotfix" ] || [ "$revisionType" = "patch" ]; then
           echo OK
           exit 0
@@ -49,10 +72,11 @@ spec:
           exit 1
         fi
 
-    # todo: use tekton auth secrets
+
+    {{- if not $repo.tasks.promote.skip.tag }}
     - name: release-notes
-      image: registry.redhat.io/rhel8/nodejs-12
-      workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
+      image: {{ $repo.tasks.build.runtime }}
+      workingDir: /workspace/source/{{ $repo.tasks.build.context }}
       script: |
         #!/bin/sh
 
@@ -86,20 +110,19 @@ spec:
         git push origin $(params.revision-type)/$(params.revision-name) --tags
       securityContext:
         runAsUser: 0
+    {{- end }}
 
     - name: release-image
       image: registry.redhat.io/openshift4/ose-cli:latest
       script: |
         #!/bin/sh
-        replace=$(inputs.params.revision-name)
-        revisionName=${replace//./-}
-        appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-        oc tag {{ .Values.application.environments.development }}/{{ .Values.application.name }}-development:$(inputs.params.revision-name) {{ .Values.application.environments.production }}/{{ .Values.application.name }}-production:$(inputs.params.revision-name)
-        oc tag {{ .Values.application.environments.production }}/{{ .Values.application.name }}-production:$(inputs.params.revision-name) {{ .Values.application.environments.production }}/{{ .Values.application.name }}-production:$(inputs.params.revision-name)
-        oc get deployment/$appname -n {{ .Values.application.environments.production }}
+
+        oc tag $(params.image-path) $(cat /tekton/results/promote)
+        oc tag $(cat /tekton/results/promote) $(cat /tekton/results/promote)
+        oc get deployment/$(cat /tekton/results/deployment) -n {{ $application.environments.production }}
         if [[ $? -ne 0 ]]
         then
-            oc new-app --name=$appname -i={{ .Values.application.name }}-production:$(inputs.params.revision-name) --namespace={{ .Values.application.environments.production }} --labels=app.name={{ .Values.application.name }}
+            oc new-app --name=$(cat /tekton/results/deployment) -i=$(cat /tekton/results/promote) --namespace={{ $application.environments.production }} --labels=app.name={{ $application.name }}
         else
             echo "Application already exists."
         fi
@@ -107,34 +130,28 @@ spec:
     - name: app-expose
       image: registry.redhat.io/openshift4/ose-cli:latest
       script: |
-        #!/bin/sh
-        replace=$(inputs.params.revision-name)
-        revisionName=${replace//./-}
-        hostname=v$revisionName-{{ .Values.application.environments.production }}.{{ .Values.cluster }}
-        appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-        
+        #!/bin/sh        
         sleep 10
-        oc get svc/$appname -n {{ .Values.application.environments.production }}
+        oc get svc/$(cat /tekton/results/deployment) -n {{ $application.environments.production }}
         if [[ $? -ne 0 ]]; then
           echo "Exposing"
-          oc expose svc/$appname -n {{ .Values.application.environments.production }}
+          oc expose svc/$(cat /tekton/results/deployment) -n {{ $application.environments.production }}
         else
           echo "Application is already exposed."
-          echo $hostname
+          echo $(cat /tekton/results/hostname)
         fi
 
         sleep 10
         
-        oc get route/$appname -n {{ .Values.application.environments.production }}
+        oc get route/$(cat /tekton/results/deployment) -n {{ $application.environments.production }}
         if [[ $? -ne 0 ]]; then
           echo "Creating routes"
-          oc create route edge --service $appname --port 8080 --hostname $hostname -n {{ .Values.application.environments.production }}
+          oc create route edge --service $(cat /tekton/results/deployment) --port 8080 --hostname $(cat /tekton/results/hostname) -n {{ $application.environments.production }}
           sleep 5
-          oc patch svc/$appname -p '{ "spec": {"type":"LoadBalancer"}}, { "ports": [ { "name": "gw", "protocol": "TCP", "port": 8080,"targetPort": 8080 } ] } }' -n {{ .Values.application.environments.production }}
-          # oc expose svc/nodejs-tekton-release-1-2-0 -n nodejs-tekton-production
+          oc patch svc/$(cat /tekton/results/deployment) -p '{ "spec": {"type":"LoadBalancer"}}, { "ports": [ { "name": "gw", "protocol": "TCP", "port": 8080,"targetPort": 8080 } ] } }' -n {{ $application.environments.production }}
         else
           echo "Route is already available."
-          echo $hostname
+          echo $(cat /tekton/results/hostname)
         fi
 
     - name: app-labels
@@ -143,14 +160,13 @@ spec:
         #!/bin/sh
         replace=$(inputs.params.revision-name)
         revisionName=${replace//./-}
-        appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-        environment={{ .Values.application.environments.production }}
-        oc label deployment/$appname --overwrite app.kubernetes.io/name=$appname -n $environment
-        oc label deployment/$appname --overwrite app.version=$revisionName -n $environment
-        oc label deployment/$appname --overwrite app.revision-id=$(inputs.params.revision-short) -n $environment
-        oc label deployment/$appname --overwrite app.revision-type=$(inputs.params.revision-type) -n $environment
-        oc label deployment/$appname --overwrite app.revision-name=$revisionName -n $environment
-        oc label deployment/$appname --overwrite app.revision-author=$(inputs.params.author) -n $environment
+        environment={{ $application.environments.production }}
+        oc label deployment/$(cat /tekton/results/deployment) --overwrite app.kubernetes.io/name=$(cat /tekton/results/deployment) -n $environment
+        oc label deployment/$(cat /tekton/results/deployment) --overwrite app.version=$revisionName -n $environment
+        oc label deployment/$(cat /tekton/results/deployment) --overwrite app.revision-id=$(inputs.params.revision-short) -n $environment
+        oc label deployment/$(cat /tekton/results/deployment) --overwrite app.revision-type=$(inputs.params.revision-type) -n $environment
+        oc label deployment/$(cat /tekton/results/deployment) --overwrite app.revision-name=$revisionName -n $environment
+        oc label deployment/$(cat /tekton/results/deployment) --overwrite app.revision-author=$(inputs.params.author) -n $environment
 
     - name: app-envs
       image: registry.redhat.io/openshift4/ose-cli:latest
@@ -158,78 +174,64 @@ spec:
         #!/bin/sh
         replace=$(inputs.params.revision-name)
         revisionName=${replace//./-}
-        appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-        environment={{ .Values.application.environments.production }}
-        oc set env deployment/$appname --list -n $environment
-        oc set env deployment/$appname --overwrite environment=production -n $environment
-        oc set env deployment/$appname --overwrite version=$(inputs.params.revision-name) -n $environment
-        oc set env deployment/$appname --overwrite revision-id=$(inputs.params.revision-short) -n $environment
-        oc set env deployment/$appname --overwrite revision-name=$revisionName -n $environment
-        oc set env deployment/$appname --overwrite revision-type=$(inputs.params.revision-type) -n $environment
+        environment={{ $application.environments.production }}
+        oc set env deployment/$(cat /tekton/results/deployment) --list -n $environment
+        oc set env deployment/$(cat /tekton/results/deployment) --overwrite environment=production -n $environment
+        oc set env deployment/$(cat /tekton/results/deployment) --overwrite version=$(inputs.params.revision-name) -n $environment
+        oc set env deployment/$(cat /tekton/results/deployment) --overwrite revision-id=$(inputs.params.revision-short) -n $environment
+        oc set env deployment/$(cat /tekton/results/deployment) --overwrite revision-name=$revisionName -n $environment
+        oc set env deployment/$(cat /tekton/results/deployment) --overwrite revision-type=$(inputs.params.revision-type) -n $environment
 
     - name: app-secrets
       image: registry.redhat.io/openshift4/ose-cli:latest
       command: ["/bin/bash", "-c"]
       args:
         - |-
-          replace=$(inputs.params.revision-name)
-          revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
           # example
-          # oc set env deployment/$appname --from secret/input -n {{ .Values.application.environments.production }}
+          # oc set env deployment/$(cat /tekton/results/deployment) --from secret/input -n {{ $application.environments.production }}
 
     - name: app-probes
       image: registry.redhat.io/openshift4/ose-cli:latest
       command: ["/bin/bash", "-c"]
       args:
         - |-
-          replace=$(inputs.params.revision-name)
-          revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-          oc set probe deployment/$appname --remove --readiness --liveness -n {{ .Values.application.environments.production }}
-          oc set probe deployment/$appname --readiness --get-url=http://:8080/ --initial-delay-seconds=30 -n {{ .Values.application.environments.production }}
+          oc set probe deployment/$(cat /tekton/results/deployment) --remove --readiness --liveness -n {{ $application.environments.production }}
+          oc set probe deployment/$(cat /tekton/results/deployment) --readiness --get-url=http://:8080/ --initial-delay-seconds=30 -n {{ $application.environments.production }}
 
+  {{- if not $repo.tasks.promote.skip.autoscale }}
     - name: app-autoscale
       image: registry.redhat.io/openshift4/ose-cli:latest
       script: |
         #!/bin/sh
+        min=1
+        max=10
+        threshold=50
 
-        replace=$(inputs.params.revision-name)
-        revisionName=${replace//./-}
-
-        if [ "$(inputs.params.revision-type)" == "release" ] || [ "$(inputs.params.revision-type)" == "hotfix" ] || [ "$(inputs.params.revision-type)" == "patch" ]; then
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-          min=1
-          max=10
-          threshold=50
-
-          oc get hpa $appname -n {{ .Values.application.environments.production }}
-          if [[ $? -ne 0 ]]; then
-            oc autoscale deployment $appname \
-              --min $min --max $max --cpu-percent=$threshold \
-              --namespace {{ .Values.application.environments.production }}
-          else
-            echo "Application autoscale is already configured."
-          fi
+        oc get hpa $(cat /tekton/results/deployment) -n {{ $application.environments.production }}
+        if [[ $? -ne 0 ]]; then
+          oc autoscale deployment $(cat /tekton/results/deployment) \
+            --min $min --max $max --cpu-percent=$threshold \
+            --namespace {{ $application.environments.production }}
+        else
+          echo "Application autoscale is already configured."
         fi
+  {{- end }}
 
     - name: app-triggers
       image: registry.redhat.io/openshift4/ose-cli:latest
       command: ["/bin/bash", "-c"]
       args:
         - |-
-          replace=$(inputs.params.revision-name)
-          revisionName=${replace//./-}
-          appname={{ .Values.application.name }}-$(inputs.params.revision-type)-$revisionName
-          oc set triggers deployment/$appname -n {{ .Values.application.environments.production }}
+          oc set triggers deployment/$(cat /tekton/results/deployment) -n {{ $application.environments.production }}
 
+  {{- if not $repo.tasks.promote.skip.report }}
     - name: report
       image: registry.redhat.io/ubi8/ubi:latest
       env:
         - name: GITHUBTOKEN
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.pipeline.webhook.github.secret }}
+              name: {{ $repo.secret }}
               key: password
       script: |
         #!/usr/libexec/platform-python
@@ -260,3 +262,7 @@ spec:
             # sys.exit(resp.read())
         else:
           print("GitHub status 'success' has been set")
+    {{- end }}
+
+  {{- end }}
+  {{- end }}

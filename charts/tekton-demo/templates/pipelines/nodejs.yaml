@@ -24,10 +24,6 @@ spec:
   resources:
     - name: {{ $application.name }}-git
       type: git
-    - name: {{ $application.name }}-development
-      type: image
-    - name: {{ $application.name }}-production
-      type: image
     - name: {{ $application.name }}-documentation
       type: image
   params:
@@ -141,29 +137,78 @@ spec:
           value: {{ $repo.tasks.build.command | default false | quote }}
         - name: context
           value: {{ $repo.tasks.build.context }}
+        - name: repo-id
+          value: {{ $repo.id }}
         - name: revision-name
           value: $(tasks.{{ $repo.name }}.results.revision-name)
 
     # task to deploy to development stage
     - name: deploy-{{ $repo.id }}
       taskRef:
-        name: deploy
+        name: {{ $repo.id }}-deploy
       runAfter:
         - build-{{ $repo.id }}
       params:
         - name: cluster
           value: {{ $cluster }}
-        - name: ref
-          value: $(tasks.{{ $repo.name }}.results.ref)
-        - name: revision
-          value: $(tasks.{{ $repo.name }}.results.revision)
+        - name: image
+          value: $(tasks.build-{{ $repo.id }}.results.image)
+        - name: image-path
+          value: $(tasks.build-{{ $repo.id }}.results.image-path)
         - name: revision-short
           value: $(tasks.{{ $repo.name }}.results.revision-short)
         - name: revision-type
           value: $(tasks.{{ $repo.name }}.results.revision-type)
         - name: revision-name
           value: $(tasks.{{ $repo.name }}.results.revision-name)
-          
+
+    - name: test-stress-{{ $repo.id }}
+      taskRef:
+        name: test-performance
+      runAfter:
+        - deploy-{{ $repo.id }}
+      params:
+      - name: hostname
+        value: $(tasks.deploy-{{ $repo.id }}.results.hostname)
+      - name: revision-type
+        value: $(tasks.{{ $repo.name }}.results.revision-type)
+
+    - name: promote-{{ $repo.id }}
+      conditions:
+        - conditionRef: is-allowed-production
+          params:
+            - name: revision-type
+              value: $(tasks.{{ $repo.name }}.results.revision-type)
+      taskRef:
+        name: {{ $repo.id }}-promote
+      workspaces:
+      - name: shared
+        workspace: {{ $application.name }}-shared
+      - name: {{ $repo.id }}-source
+        workspace: {{ $application.name }}-{{ $repo.id }}-source
+      runAfter:
+        - test-stress-{{ $repo.id }}
+      params:
+      - name: cluster
+        value: {{ $cluster }}
+      - name: image-path
+        value: $(tasks.build-{{ $repo.id }}.results.image-path)
+      - name: repofullname
+        value: $(params.repofullname)
+      - name: ref
+        value: $(tasks.{{ $repo.name }}.results.ref)
+      - name: revision
+        value: $(tasks.{{ $repo.name }}.results.revision)
+      - name: revision-short
+        value: $(tasks.{{ $repo.name }}.results.revision-short)
+      - name: revision-type
+        value: $(tasks.{{ $repo.name }}.results.revision-type)
+      - name: revision-name
+        value: $(tasks.{{ $repo.name }}.results.revision-name)
+      - name: author
+        value: $(params.author)
+      - name: email
+        value: $(params.email)
 
     {{- end }}
 
@@ -212,27 +257,6 @@ spec:
     #       value: $(tasks.git.results.revision-name)
     #     - name: author
     #       value: $(tasks.git.results.author)
-
-    # - name: deploy
-    #   taskRef:
-    #     name: deploy
-    #   runAfter:
-    #     - docs
-    #     - build-backend
-    #     - build-frontend
-    #   params:
-    #     - name: cluster
-    #       value: {{ .Values.cluster }}
-    #     - name: ref
-    #       value: $(tasks.git.results.ref)
-    #     - name: revision
-    #       value: $(tasks.git.results.revision)
-    #     - name: revision-short
-    #       value: $(tasks.git.results.revision-short)
-    #     - name: revision-type
-    #       value: $(tasks.git.results.revision-type)
-    #     - name: revision-name
-    #       value: $(tasks.git.results.revision-name)
           
     # - name: test-stress
     #   taskRef:

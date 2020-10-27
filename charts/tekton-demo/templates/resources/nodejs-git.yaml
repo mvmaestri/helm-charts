@@ -1,16 +1,12 @@
 {{ $application := default dict .Values.application }}
-{{- if .Values.repositories }}
-{{- range $repo := .Values.repositories }}
 ---
 apiVersion: tekton.dev/v1alpha1
 kind: PipelineResource
 metadata:
-  name: {{ $application.name }}-{{ $repo.id }}-git
+  name: {{ $application.name }}-git
 spec:
   type: git
   params:
     - name: url
     - name: revision
     - name: submodules
-{{- end }}
-{{- end }}

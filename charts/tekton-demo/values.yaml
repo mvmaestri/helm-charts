@@ -34,9 +34,10 @@ config:
       buildah: registry.redhat.io/rhel8/buildah
   deployment:
     strategy:
-      matchVersion: false
+      revisionMatch: false
       latest: 
         from: develop
+
 
 repositories:
   - id: backend
@@ -54,6 +55,7 @@ repositories:
         skip:
           helm: true
           lint: true
+          audit: true
           unit: true
           coverage: true
       build:
@@ -63,10 +65,17 @@ repositories:
         skip:
           autoscale: true
       tests:
-        e2e: 
-          skip: false
-          command: npm run e2e
-        stress: true
+        skip:
+          e2e: false
+          stress: false
+        options:
+          e2e: 
+            command: npm run e2e
+      promote:
+        skip: 
+          tag: false
+          autoscale: true
+          report: false
 
   - id: frontend
     name: treo
@@ -82,7 +91,9 @@ repositories:
       standards:
         skip: 
           helm: true
+          lint: true
           audit: true
+          unit: true
           coverage: true
       build:
         runtime: registry.redhat.io/rhel8/nodejs-12
@@ -95,4 +106,10 @@ repositories:
         e2e: 
           skip: false
           command: npm run e2e
-        stress: true
+        performance: 
+          skip: false
+      promote:
+        skip: 
+          tag: false
+          autoscale: true
+          report: false

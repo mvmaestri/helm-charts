@@ -1,16 +1,13 @@
+{{ $application := default dict .Values.application }}
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: test-integration
-  namespace: {{ .Values.application.environments.cicd }}
+  namespace: {{ $application.environments.cicd }}
 spec:
   workspaces:
     - name: source
   params:
-    - name: ref
-      description: Git reference
-    - name: repourl
-      description: repository url from github payload
     - name: repofullname
       description: full name user-org/reponame from github
     - name: revision

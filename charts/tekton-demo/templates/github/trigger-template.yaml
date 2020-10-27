@@ -75,20 +75,13 @@ spec:
         name: {{ $application.name }}
       resources:
         - name: {{ $application.name }}-git
-          # todo: replace images per repo
           resourceSpec:
             type: git
             params:
               - name: url
                 value: $(params.repourl)
               - name: revision
-                value: $(params.revision)
-        - name: {{ $application.name }}-development
-          resourceRef:
-            name: {{ $application.name }}-development
-        - name: {{ $application.name }}-production
-          resourceRef:
-            name: {{ $application.name }}-production
+                value: $(params.revision)            
         - name: {{ $application.name }}-documentation
           resourceRef:
             name: {{ $application.name }}-documentation
