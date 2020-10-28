@@ -34,23 +34,26 @@ config:
       buildah: registry.redhat.io/rhel8/buildah
   deployment:
     strategy:
-      revisionMatch: false
-      latest: 
+      revisionMatch: false # if revisionMatch is true, then all branch names must match across multiple repositories
+      latest:              # if is false, then the task will pull the latest version from the value specified
         from: develop
-
 
 repositories:
   - id: backend
     name: do101-apps
     org: mvmaestri
     user: mvmaestri
-    url: github.com/mvmaestri/do101-apps.git # check for orgs
+    url: https://github.com/mvmaestri/do101-apps.git # check for orgs
     secret: do101-github-webhook-secret # todo: override if does not exists
     key: do101-github-deploy-secret
     tasks:
       validate:
+        npmVersion: true
+        tagExists: true
         fileExists:
           - package.json
+          - package-lock.json
+          - chart/Chart.yaml
       standards:
         skip:
           helm: true
@@ -80,12 +83,15 @@ repositories:
   - id: frontend
     name: treo
     runtime: registry.redhat.io/rhel8/nodejs-12
+    url: https://github.com/mvmaestri/treo.git
     org: mvmaestri
     user: mvmaestri
     secret: do101-github-webhook-secret
     key: do101-github-deploy-secret
     tasks:
       validate:
+        npmVersion: false
+        tagExists: false
         fileExists:
           - package.json
       standards:

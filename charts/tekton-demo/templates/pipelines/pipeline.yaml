@@ -24,13 +24,21 @@ spec:
   resources:
     - name: {{ $application.name }}-git
       type: git
-    - name: {{ $application.name }}-documentation
-      type: image
   params:
     - name: ref
       description: Ref of the application
     - name: revision
       description: git unique head commit id
+    - name: revision-short
+      description: sha truncated to 7
+    - name: revision-type
+      description: branch type
+    - name: revision-name
+      description: branch name or version
+    - name: revision-alias
+      description: alias name compatible
+    - name: reponame
+      description: repository name from event listener payload
     - name: repourl
       description: repository full name
     - name: repofullname
@@ -43,68 +51,40 @@ spec:
       description: commit message
 
   tasks:
-
-    - name: treo
-      taskRef:
-        name: git-clone
-      workspaces:
-      - name: output
-        workspace: {{ $application.name }}-frontend-source
-      params:
-      - name: verbose
-        value: "false"
-      - name: url
-        value: $(params.repourl)
-      - name: revision
-        value: $(params.revision)
-      - name: ref
-        value: $(params.ref)
-      - name: repourl
-        value: $(params.repourl)
-      - name: repofullname
-        value: $(params.repofullname)
-      - name: author
-        value: $(params.author)
-      - name: message
-        value: $(params.message)
-      - name: pipelinerun
-        value: $(context.pipelineRun.name)
-      - name: context
-        value: .
-
-    # todo: helm range 
-    - name: do101-apps
-      taskRef:
-        name: git-clone
-      workspaces:
-      - name: output
-        workspace: {{ $application.name }}-backend-source
-      params:
-      - name: verbose
-        value: "false"
-      - name: url
-        value: https://github.com/mvmaestri/do101-apps.git
-      - name: revision
-        value: {{ $config.deployment.strategy.latest.from }}
-      - name: ref
-        value: $(params.ref)
-      - name: repourl
-        value: $(params.repourl)
-      - name: repofullname
-        value: $(params.repofullname)
-      - name: author
-        value: $(params.author)
-      - name: message
-        value: $(params.message)
-      - name: pipelinerun
-        value: $(context.pipelineRun.name)
-      - name: context
-        value: weather
-
-
     
     # standards tasks for multiple repositories
     {{- range $repo := .Values.repositories }}
+    - name: {{ $repo.name }}
+      taskRef:
+        name: git-{{ $repo.id }}
+      workspaces:
+      - name: output
+        workspace: {{ $application.name }}-{{ $repo.id }}-source
+      params:
+      - name: ref
+        value: $(params.ref)
+      - name: revision
+        value: $(params.revision)
+      - name: revision-type
+        value: $(params.revision-type)
+      - name: revision-name
+        value: $(params.revision-name)
+      - name: revision-alias
+        value: $(params.revision-alias)
+      - name: revision-short
+        value: $(params.revision-short)
+      - name: repourl
+        value: $(params.repourl)
+      - name: reponame
+        value: $(params.reponame)
+      - name: repofullname
+        value: $(params.repofullname)
+      - name: author
+        value: $(params.author)
+      - name: message
+        value: $(params.message)
+
+
     - name: {{ $repo.id }}
       taskRef:
         name: {{ $repo.id }}-standards
@@ -195,8 +175,6 @@ spec:
         value: $(tasks.build-{{ $repo.id }}.results.image-path)
       - name: repofullname
         value: $(params.repofullname)
-      - name: ref
-        value: $(tasks.{{ $repo.name }}.results.ref)
       - name: revision
         value: $(tasks.{{ $repo.name }}.results.revision)
       - name: revision-short

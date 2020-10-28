@@ -15,6 +15,14 @@ spec:
     value: $(body.ref)
   - name: revision
     value: $(body.head_commit.id)
+  - name: revision-short
+    value: $(body.extensions.revision-short)
+  - name: revision-type
+    value: $(body.extensions.revision-type)
+  - name: revision-name
+    value: $(body.extensions.revision-name)
+  - name: revision-alias
+    value: $(body.extensions.revision-alias)
   - name: repourl
     value: $(body.repository.html_url)
   - name: reponame

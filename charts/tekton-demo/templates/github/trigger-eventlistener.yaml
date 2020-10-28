@@ -8,13 +8,27 @@ kind: EventListener
 metadata:
   name: {{ $application.name }}-{{ $repo.id }}
   namespace: {{ $application.environments.cicd }}
+  labels:
+    from: github
 spec:
   serviceAccountName: {{ $pipeline.sa.triggers }}
   triggers:
     - name: cel-trig-with-canonical
       interceptors:
         - cel:
-            filter: "header.canonical('X-GitHub-Event') == 'push'"
+            overlays:
+            - key: extensions.revision-type
+              expression: "body.ref.split('/')[2]"
+            - key: extensions.revision-name
+              expression: "body.ref.split('/')[3]"
+            - key: extensions.revision-alias
+              expression: "body.ref.split('/')[3].replace('.','-')"
+            - key: extensions.revision-short
+              expression: "body.head_commit.id.truncate(7)"
+        - cel:
+            filter: "header.match('X-GitHub-Event', 'push')"
+        - cel:
+            filter: "body.ref.startsWith('refs/heads/release') || body.ref.startsWith('refs/heads/feature') || body.ref.startsWith('refs/heads/hotfix') || body.ref.startsWith('refs/heads/patch') || body.ref.startsWith('refs/heads/develop')"
       bindings:
         - ref: {{ $application.name }}-{{ $repo.id }}-trigger-binding
       template:

@@ -69,6 +69,8 @@ spec:
           value: $(params.message)
         - name: repourl
           value: $(params.repourl)
+        - name: reponame
+          value: $(params.reponame)
         - name: repofullname
           value: $(params.repofullname)
       pipelineRef:
@@ -81,9 +83,6 @@ spec:
               - name: url
                 value: $(params.repourl)
               - name: revision
-                value: $(params.revision)            
-        - name: {{ $application.name }}-documentation
-          resourceRef:
-            name: {{ $application.name }}-documentation
+                value: $(params.revision)
 {{- end }}
 {{- end }}

@@ -1,7 +1,13 @@
+{{ $application := default dict .Values.application }}
+{{ $cluster := default dict .Values.cluster }}
+{{ $config := default dict .Values.config }}
+{{- if .Values.repositories }}
+{{- range $repo := .Values.repositories }}
+---
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: git-clone
+  name: git-{{ $repo.id }}
   labels:
     app.kubernetes.io/version: "0.2"
   annotations:
@@ -20,9 +26,6 @@ spec:
     - name: output
       description: The git repo will be cloned onto the volume backing this workspace
   params:
-    - name: url
-      description: git url to clone
-      type: string
     - name: revision
       description: git revision to checkout (branch, tag, sha, ref…)
       type: string
@@ -62,24 +65,32 @@ spec:
       description: git no proxy - opt out of proxying HTTP/HTTPS requests
       type: string
       default: ""
-    - name: verbose
-      description: log the commands used during execution
-      type: string
-      default: "true"
     - name: ref
+      type: string
+      description: ref from the event listener payload, e.g refs/heads/release/1.0.0
+    - name: revision-type
+      type: string
+    - name: revision-name
+      type: string
+    - name: revision-short
+      type: string
+    - name: revision-alias
       type: string
     - name: repourl
       type: string
+      description: url of the repository, from the event listener payload e.g body.repository.html_url (it can be overwritten)
+    - name: reponame
+      type: string
+      description: repo name from event listener payload
     - name: repofullname
       type: string
+      description: includes user or organization
     - name: author
       type: string
+      description: username from event listener payload head_commit.author.username
     - name: message
       type: string
-    - name: pipelinerun
-      type: string
-    - name: context
-      type: string
+      description: commit message from event listener payload head_commit.message
   results:
     - name: commit
       description: The precise commit SHA that was fetched by this Task
@@ -103,20 +114,12 @@ spec:
       description: repository url from github payload
     - name: repofullname
       description: full name user-org/reponame from github
-    - name: message
-      description: Contains the commit message
-    - name: author
-      description: Contains the author username
-
   steps:
     - name: clone
       image: gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.17.1
       script: |
         #!/bin/sh
         set -eu -o pipefail
-        if [[ "$(params.verbose)" == "true" ]] ; then
-          set -x
-        fi
         CHECKOUT_DIR="$(workspaces.output.path)/$(params.subdirectory)"
         cleandir() {
           # Delete any existing contents of the repo directory if it exists.
@@ -138,55 +141,92 @@ spec:
         test -z "$(params.httpProxy)" || export HTTP_PROXY=$(params.httpProxy)
         test -z "$(params.httpsProxy)" || export HTTPS_PROXY=$(params.httpsProxy)
         test -z "$(params.noProxy)" || export NO_PROXY=$(params.noProxy)
-        /ko-app/git-init \
-          -url "$(params.url)" \
-          -revision "$(params.revision)" \
-          -refspec "$(params.refspec)" \
-          -path "$CHECKOUT_DIR" \
-          -sslVerify="$(params.sslVerify)" \
-          -submodules="$(params.submodules)" \
-          -depth "$(params.depth)"
+
+        # condition to clone all repos that are not coming from payload
+        # based on the config.deployment.stragegy
+        echo Comparing {{ $repo.name }} == $(params.reponame)
+        if [[ "{{ $repo.name }}" == "$(params.reponame)" ]]; then
+          # coming from payload, so clone repository from payload
+          echo Cloning $(params.repourl) $(params.ref) $(params.revision) from event listener payload
+          /ko-app/git-init \
+            -url "$(params.repourl)" \
+            -revision "$(params.revision)" \
+            -path "$CHECKOUT_DIR" \
+            -sslVerify="$(params.sslVerify)" \
+            -submodules="$(params.submodules)" \
+            -depth "$(params.depth)"
+
+          printf %s "$(params.repourl)" > $(results.url.path)
+        else
+          # different repo from the payload, so clone all the ones that are not from payload
+        {{- if not $config.deployment.strategy.revisionMatch }}
+            echo Deployment strategy revisionMatch is {{ $config.deployment.strategy.revisionMatch }}
+            echo Cloning {{ $repo.url }} {{ $config.deployment.strategy.latest.from }}
+            /ko-app/git-init \
+              -url "{{ $repo.url }}" \
+              -revision "{{ $config.deployment.strategy.latest.from }}" \
+              -path "$CHECKOUT_DIR" \
+              -sslVerify="$(params.sslVerify)" \
+              -submodules="$(params.submodules)" \
+              -depth "$(params.depth)"
+        
+            printf %s "{{ $repo.url }}" > $(results.url.path)
+        {{- end }}
+        fi
+
         cd "$CHECKOUT_DIR"
         RESULT_SHA="$(git rev-parse HEAD)"
         EXIT_CODE="$?"
         if [ "$EXIT_CODE" != 0 ] ; then
           exit $EXIT_CODE
         fi
-        # ensure we don't add a trailing newline to the result
-        echo -n "$RESULT_SHA" > $(results.commit.path)
-        echo -n "$(params.url)" > $(results.url.path)
+
+        printf %s "$RESULT_SHA" >> $(results.commit.path)
 
     - name: variables
       image: registry.redhat.io/openshift4/ose-cli:latest
       resources: {}
       script: |
         #!/bin/sh
-        echo $(oc config view)
-        server=$(echo $(oc config view --minify -o jsonpath='{.clusters[*].cluster.server}'))
-        cluster=$(echo "apps."${server//https:\/\/api./})
-        cluster=${cluster//:6443/}
-        echo $cluster
-        echo $(params.ref)
-        echo $(params.revision)
-        echo $(params.author)
-        echo $(params.message)
-        echo $(params.ref) > $(results.ref.path)
-        echo $(params.revision) | sed 's/ *$//g' > $(results.revision.path)
-        echo $(params.author) > $(results.author.path)
-        echo $(params.message) > $(results.message.path)
-        echo $(params.repourl) > $(results.repourl.path)
-        echo $(params.repofullname) > $(results.repofullname.path)
-        echo $cluster > $(results.url.path)/tekton/results/cluster
-        echo $(params.ref) | awk -F "/" '{if (NF > 1) {printf "%s", $3 > "/tekton/results/revision-type"; printf "%s", $4 > "/tekton/results/revision-name"; printf "%s/%s", $3, $4 > "/tekton/results/full-revision-name"} else {printf "%s", "unknown" > "/tekton/results/revision-type"; printf "%s", $3 > "/tekton/results/revision-name"; printf "%s", $4 > "/tekton/results/full-revision-name"}}'
-        if [ "$(cat /tekton/results/revision-type)" == "develop" ]; then
-          printf %s "develop" >> /tekton/results/revision-name
+        # todo: get cluster url
+        if [[ "{{ $repo.name }}" == "$(params.reponame)" ]]; then
+          # from event listener payload
+          echo $(params.ref) > $(results.ref.path)
+          echo $(params.revision) | sed 's/ *$//g' > $(results.revision.path)
+          echo $(params.repourl) > $(results.repourl.path)
+          echo $(params.repofullname) > $(results.repofullname.path)
+          printf %s "$(params.revision-name)" > $(results.revision-name.path)
+          printf %s "$(params.revision-type)" > $(results.revision-type.path)
+          printf %s "$(params.revision-short)" > $(results.revision-short.path)
+          printf %s "$(params.revision-alias)" > $(results.revision-alias.path)
+          if [ "$(cat /tekton/results/revision-type)" == "develop" ]; then
+            printf %s "develop" > $(results.revision-name.path)
+          fi
+  
+          echo ref $(cat $(results.ref.path))
+          echo revision $(cat $(results.revision.path))
+          echo revision-alias $(cat $(results.revision-alias.path))
+          echo revision-short $(cat $(results.revision-short.path))
+          echo revision-type $(cat $(results.revision-type.path))
+          echo revision-name $(cat $(results.revision-name.path))
+          echo author $(params.author)
+          echo commit: $(params.message)
+        else
+          # overwriten from inputs
+          if [ "{{ $config.deployment.strategy.latest.from }}" == "develop" ]; then
+            printf %s "develop" > $(results.revision-name.path)
+            printf %s "develop" > $(results.revision-type.path)
+          else
+            printf %s "{{ $config.deployment.strategy.latest.from }}" | awk -F "/" '{ printf "%s", $1 > $(results.revision-type.path) }'
+            printf %s "{{ $config.deployment.strategy.latest.from }}" | awk -F "/" '{ printf "%s", $2 > $(results.revision-name.path) }'
+          fi
+          echo repo-id: {{ $repo.id }}
+          echo revision-type $(cat $(results.revision-type.path))
+          echo revision-name $(cat $(results.revision-name.path))
         fi
-        echo "Revision-type:" $(cat /tekton/results/revision-type)
-        echo "Revision-name:" $(cat /tekton/results/revision-name)
-
 
     - name: validate
-      image: registry.redhat.io/rhel8/nodejs-12
+      image: {{ $repo.tasks.build.runtime }}
       resources: {}
       workingDir: /workspace/output
       script: |
@@ -195,19 +235,8 @@ spec:
         ref=$(cat /tekton/results/ref)
         revisionType=$(cat /tekton/results/revision-type)
         revisionName=$(cat /tekton/results/revision-name)
-        printf %s "$(git rev-parse --short HEAD)" >> /tekton/results/revision-short
-        package=$(params.context)/package.json
-        git fetch --all --tags > /dev/null 2>&1
-        if git rev-parse -q --verify "refs/tags/$revisionName" >/dev/null; then
-            echo "Tag $revisionName already exists"
-            exit 1
-        fi
-
-        if [ ! -f $package ]; then
-            ls -ls
-            echo "Missing package.json"
-            exit 1 
-        fi
+        printf %s "$(git rev-parse HEAD)" > $(results.revision.path)
+        printf %s "$(git rev-parse --short HEAD)" > $(results.revision-short.path)
 
         # verify if it's not a tag webhook event
         if [[ $ref == *"refs/tags/"* ]]; then
@@ -222,9 +251,28 @@ spec:
           exit 1
         fi
 
-        echo OK
+      {{- if $repo.tasks.validate.tagExists }}
+        git fetch --all --tags > /dev/null 2>&1
+        if git rev-parse -q --verify "refs/tags/$revisionName" >/dev/null; then
+            echo "Tag $revisionName already exists"
+            exit 1
+        fi
+      {{- end }}
 
-        before=$(cat $package \
+      {{- if $repo.tasks.validate.fileExists }}
+        ls -ls
+        {{- range $i, $file := $repo.tasks.validate.fileExists }}
+        file{{ $i }}={{ $repo.tasks.build.context }}/{{ $file }}
+        if [ ! -f $file{{ $i }} ]; then
+            echo "Missing $file{{ $i }}"
+            exit 1 
+        fi
+        {{- end }}
+      {{- end }}
+
+      {{- if $repo.tasks.validate.npmVersion }}
+
+        before=$(cat {{ $repo.tasks.build.context }}/package.json \
         | grep version \
         | head -1 \
         | awk -F: '{ print $2 }' \
@@ -259,17 +307,11 @@ spec:
           echo "Skipping npm version upgrade since we are in a $(cat /tekton/results/revision-type) branch"
           exit 0
         fi
+      {{- end }}
+
+        echo OK
       securityContext:
         runAsUser: 0
 
-    # - name: status
-    #   image: registry.redhat.io/rhel8/nodejs-12
-    #   resources: {}
-    #   workingDir: /workspace/output
-    #   script: |
-    #     #!/bin/sh
-    #     curl -LO https://github.com/tektoncd/cli/releases/download/v0.13.0/tkn_0.13.0_Linux_x86_64.tar.gz
-    #     tar xvzf tkn_0.13.0_Linux_x86_64.tar.gz -C /usr/local/bin/ tkn
-    #     /usr/local/bin/tkn pr desc $(params.pipelinerun)
-    #   securityContext:
-    #     runAsUser: 0
+{{- end }}
+{{- end }}

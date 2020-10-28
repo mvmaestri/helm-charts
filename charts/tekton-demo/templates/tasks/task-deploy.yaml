@@ -65,6 +65,8 @@ spec:
           fi
 
         else
+          printf %s "false" > /tekton/results/hostname
+          printf %s "false" > /tekton/results/deployment
           echo "Branch type $(inputs.params.revision-type) does not deploy to development"
           exit 0
         fi

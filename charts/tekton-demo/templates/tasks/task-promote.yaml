@@ -16,9 +16,6 @@ spec:
     - name: cluster
       description: cluster app url
       type: string
-    - name: ref
-      description: git ref
-      type: string
     - name: repofullname
       type: string
     - name: revision
@@ -76,10 +73,11 @@ spec:
     {{- if not $repo.tasks.promote.skip.tag }}
     - name: release-notes
       image: {{ $repo.tasks.build.runtime }}
-      workingDir: /workspace/source/{{ $repo.tasks.build.context }}
+      workingDir: /workspace/{{ $repo.id }}-source/{{ $repo.tasks.build.context }}
       script: |
         #!/bin/sh
 
+        pwd
         ls -ls
 
         before=$(cat package.json \

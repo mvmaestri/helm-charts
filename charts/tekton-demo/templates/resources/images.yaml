@@ -76,57 +76,5 @@ roleRef:
   kind: ClusterRole
   name: system:image-puller
   apiGroup: rbac.authorization.k8s.io
----
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: {{ $application.name }}-production-{{ $repo.id }}
-  namespace: {{ $application.environments.cicd }}
----
-apiVersion: tekton.dev/v1alpha1
-kind: PipelineResource
-metadata:
-  name: {{ $application.name }}-development-{{ $repo.id }}
-  namespace: {{ $application.environments.cicd }}
-  labels:
-    app: {{ $application.name }}
-    repo: {{ $repo.id }}
-spec:
-  type: image
-  params:
-    - name: url
-      value: image-registry.openshift-image-registry.svc:5000/{{ $application.environments.development }}/{{ $application.name }}-development-{{ $repo.id }}
----
-apiVersion: tekton.dev/v1alpha1
-kind: PipelineResource
-metadata:
-  name: {{ $application.name }}-production-{{ $repo.id }}
-  namespace: {{ $application.environments.cicd }}
-  labels:
-    app: {{ $application.name }}
-spec:
-  type: image
-  params:
-    - name: url
-      value: image-registry.openshift-image-registry.svc:5000/{{ $application.environments.production }}/{{ $application.name }}-production-{{ $repo.id }}
 {{- end }}
 {{- end }}
----
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: {{ $application.name }}-documentation
-  namespace: {{ $application.environments.cicd }}
----
-apiVersion: tekton.dev/v1alpha1
-kind: PipelineResource
-metadata:
-  name: {{ $application.name }}-documentation
-  namespace: {{ $application.environments.cicd }}
-  labels:
-    app: {{ $application.name }}
-spec:
-  type: image
-  params:
-    - name: url
-      value: image-registry.openshift-image-registry.svc:5000/{{ $application.environments.development }}/{{ $application.name }}-documentation
