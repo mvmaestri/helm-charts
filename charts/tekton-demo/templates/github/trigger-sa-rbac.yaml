@@ -30,6 +30,7 @@ rules:
   - list
   - watch
 ---
+# todo: per repo
 apiVersion: v1
 kind: ServiceAccount
 metadata:

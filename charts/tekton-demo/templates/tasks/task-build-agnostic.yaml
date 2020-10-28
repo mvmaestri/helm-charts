@@ -34,16 +34,18 @@ spec:
     
   steps:
 
-    - name: image-prepare
+    - name: image-command
       image: $(inputs.params.runtime)
       workingDir: /workspace/source/$(inputs.params.context)
       resources: {}
       script: |
         #!/bin/sh
-        if $(inputs.params.command); then
-          $(inputs.params.command)
+        command=$(echo -e $(inputs.params.command))
+        if [ "$command" == "false" ]; then
+          echo Not specified
         else
-          echo Skipping. Not implemented: command from values.yaml
+        echo Executing $command
+          $(inputs.params.command)
         fi
       securityContext:
         runAsUser: 0
@@ -73,6 +75,7 @@ spec:
       script: |
         #!/bin/sh
         ls -ls
+        echo $(cat /tekton/results/image)
         buildah push --tls-verify=false $(cat /tekton/results/image) docker://$(cat /tekton/results/image)
       volumeMounts:
         - name: varlibcontainers
