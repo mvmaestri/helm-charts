@@ -60,9 +60,9 @@ spec:
         appname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName
         hostname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName-{{ $application.environments.production }}.{{ $cluster }}
         promote={{ $application.environments.production }}/{{ $repo.id }}:$(inputs.params.revision-name)
-        printf %s "$appname" >> /tekton/results/deployment
-        printf %s "$hostname" >> /tekton/results/hostname
-        printf %s "$promote" >> /tekton/results/image-path
+        printf %s "$appname" > /tekton/results/deployment
+        printf %s "$hostname" > /tekton/results/hostname
+        printf %s "$promote" > /tekton/results/image-path
         
         if [ "$revisionType" == "release" ] || [ "$revisionType" = "hotfix" ] || [ "$revisionType" = "patch" ]; then
           echo OK

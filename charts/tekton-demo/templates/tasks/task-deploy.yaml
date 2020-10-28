@@ -43,15 +43,15 @@ spec:
           revisionName=${replace//./-}
           appname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName
           hostname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName-{{ $application.environments.development }}.{{ $cluster }}
-          printf %s "$appname" >> /tekton/results/deployment
-          printf %s "$hostname" >> /tekton/results/hostname
+          printf %s "$appname" > /tekton/results/deployment
+          printf %s "$hostname" > /tekton/results/hostname
 
           if [ "$(inputs.params.revision-type)" == "develop" ]; then
             # overwrite develop name structure
             appname={{ $repo.id }}-$revisionName
             hostname=$revisionName-{{ $repo.id }}-{{ $application.environments.development }}.{{ $cluster }}
-            printf %s "$appname" >> /tekton/results/deployment
-            printf %s "$hostname" >> /tekton/results/hostname
+            printf %s "$appname" > /tekton/results/deployment
+            printf %s "$hostname" > /tekton/results/hostname
           fi
 
           oc get deployment/$(cat /tekton/results/deployment) -n {{ $application.environments.development }}
