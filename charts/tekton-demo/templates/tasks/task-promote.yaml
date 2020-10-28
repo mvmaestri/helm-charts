@@ -27,6 +27,9 @@ spec:
     - name: revision-type
       description: revision type usually branch type
       type: string
+    - name: revision-alias
+      description: revision alias name compatible with objects
+      type: string
     - name: revision-name
       description: revision name usually version or branch name
       type: string
@@ -51,12 +54,10 @@ spec:
       resources: {}
       script: |
         #!/bin/sh
-        replace=$(inputs.params.revision-name)
-        revisionName=${replace//./-}
         revisionType=$(params.revision-type)
-        appname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName
-        hostname={{ $repo.id }}-$(inputs.params.revision-type)-$revisionName-{{ $application.environments.production }}.{{ $cluster }}
-        promote={{ $application.environments.production }}/{{ $repo.id }}:$(inputs.params.revision-name)
+        appname={{ $repo.id }}-$(params.revision-type)-$(params.revision-alias)
+        hostname={{ $repo.id }}-$(params.revision-type)-$(params.revision-alias)-{{ $application.environments.production }}.{{ $cluster }}
+        promote={{ $application.environments.production }}/{{ $repo.id }}:$(params.revision-name)
         printf %s "$appname" > /tekton/results/deployment
         printf %s "$hostname" > /tekton/results/hostname
         printf %s "$promote" > /tekton/results/image-path
@@ -68,7 +69,6 @@ spec:
           echo "Preventing $revisionType to be promoted to a production environment"
           exit 1
         fi
-
 
     {{- if not $repo.tasks.promote.skip.tag }}
     - name: release-notes
@@ -91,6 +91,7 @@ spec:
         git config --global user.email "$(params.email)"
 
         git fetch --all --tags > /dev/null 2>&1
+        git pull origin $(params.revision-type)/$(params.revision-name)
         git checkout -b $(params.revision-type)/$(params.revision-name) > /dev/null 2>&1
         git log master..$(params.revision-type)/$(params.revision-name) --oneline --no-merges --decorate > release-v$(params.revision-name).md > /dev/null 2>&1
         
@@ -115,12 +116,12 @@ spec:
       script: |
         #!/bin/sh
 
-        oc tag $(params.image-path) $(cat /tekton/results/promote)
-        oc tag $(cat /tekton/results/promote) $(cat /tekton/results/promote)
+        oc tag $(params.image-path) $(cat /tekton/results/image-path)
+        oc tag $(cat /tekton/results/path-image) $(cat /tekton/results/path-image)
         oc get deployment/$(cat /tekton/results/deployment) -n {{ $application.environments.production }}
         if [[ $? -ne 0 ]]
         then
-            oc new-app --name=$(cat /tekton/results/deployment) -i=$(cat /tekton/results/promote) --namespace={{ $application.environments.production }} --labels=app.name={{ $application.name }}
+            oc new-app --name=$(cat /tekton/results/deployment) -i=$(cat /tekton/results/image-path) --namespace={{ $application.environments.production }} --labels=app.name={{ $application.name }}
         else
             echo "Application already exists."
         fi

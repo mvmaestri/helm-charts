@@ -49,10 +49,9 @@ repositories:
     tasks:
       validate:
         npmVersion: true
-        tagExists: true
+        ignoreTags: false
         fileExists:
           - package.json
-          - package-lock.json
           - chart/Chart.yaml
       standards:
         skip:
@@ -91,7 +90,7 @@ repositories:
     tasks:
       validate:
         npmVersion: false
-        tagExists: false
+        ignoreTags: false
         fileExists:
           - package.json
       standards:

@@ -17,6 +17,14 @@ spec:
     description: git reference or branch name
   - name: revision
     description: The revision of your git repository
+  - name: revision-short
+    description: sha truncated to 7
+  - name: revision-type
+    description: revision type
+  - name: revision-name
+    description: revision name or version 
+  - name: revision-alias
+    description: compatible with names (replaced . to -)
   - name: repourl
     description: The url of your git repository
   - name: reponame
@@ -33,11 +41,13 @@ spec:
   - apiVersion: tekton.dev/v1beta1
     kind: PipelineRun
     metadata:
-      generateName: $(params.reponame)-$(params.author)-
+      generateName: $(params.revision-type)-$(params.revision-alias)-$(params.revision-short)-$(params.author)-
       namespace: {{ $application.environments.cicd }}
       labels:
         webhooks.tekton.dev/repo: $(params.reponame)
         webhooks.tekton.dev/author: $(params.author)
+        webhooks.tekton.dev/revision: $(params.revision-short)
+        webhooks.tekton.dev/revision-type: $(params.revision-type)
       annotations:
         argocd.argoproj.io/compare-options: IgnoreExtraneous
     spec:
@@ -61,6 +71,14 @@ spec:
           value: $(params.ref)
         - name: revision
           value: $(params.revision)
+        - name: revision-short
+          value: $(params.revision-short)
+        - name: revision-type
+          value: $(params.revision-type)
+        - name: revision-name
+          value: $(params.revision-name)
+        - name: revision-alias
+          value: $(params.revision-alias)
         - name: author
           value: $(params.author)
         - name: email

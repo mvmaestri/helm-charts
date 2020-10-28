@@ -183,6 +183,8 @@ spec:
         value: $(tasks.{{ $repo.name }}.results.revision-type)
       - name: revision-name
         value: $(tasks.{{ $repo.name }}.results.revision-name)
+      - name: revision-alias
+        value: $(tasks.{{ $repo.name }}.results.revision-alias)
       - name: author
         value: $(params.author)
       - name: email

@@ -108,6 +108,8 @@ spec:
       description: Contains the type of branch - feature, release,...
     - name: revision-name
       description: Contains the name of the branch without the type, ie. omitting the first slash
+    - name: revision-alias
+      description: Contains the name of the branch replacing . for -
     - name: full-revision-name
       description: Contains the name of the branch without the type, ie. omitting the first slash
     - name: repourl
@@ -199,6 +201,7 @@ spec:
           printf %s "$(params.revision-type)" > $(results.revision-type.path)
           printf %s "$(params.revision-short)" > $(results.revision-short.path)
           printf %s "$(params.revision-alias)" > $(results.revision-alias.path)
+          
           if [ "$(cat /tekton/results/revision-type)" == "develop" ]; then
             printf %s "develop" > $(results.revision-name.path)
           fi
@@ -210,15 +213,19 @@ spec:
           echo revision-type $(cat $(results.revision-type.path))
           echo revision-name $(cat $(results.revision-name.path))
           echo author $(params.author)
-          echo commit: $(params.message)
+          echo commit $(params.message)
+
         else
           # overwriten from inputs
           if [ "{{ $config.deployment.strategy.latest.from }}" == "develop" ]; then
             printf %s "develop" > $(results.revision-name.path)
             printf %s "develop" > $(results.revision-type.path)
+            printf %s "develop" > $(results.revision-alias.path)
           else
             printf %s "{{ $config.deployment.strategy.latest.from }}" | awk -F "/" '{ printf "%s", $1 > $(results.revision-type.path) }'
             printf %s "{{ $config.deployment.strategy.latest.from }}" | awk -F "/" '{ printf "%s", $2 > $(results.revision-name.path) }'
+            # todo: replace . to - also here
+            printf %s "{{ $config.deployment.strategy.latest.from }}" | awk -F "/" '{ printf "%s", $2 > $(results.revision-alias.path) }'
           fi
           echo repo-id: {{ $repo.id }}
           echo revision-type $(cat $(results.revision-type.path))
@@ -232,40 +239,27 @@ spec:
       script: |
         #!/bin/sh
 
-        ref=$(cat /tekton/results/ref)
         revisionType=$(cat /tekton/results/revision-type)
         revisionName=$(cat /tekton/results/revision-name)
         printf %s "$(git rev-parse HEAD)" > $(results.revision.path)
         printf %s "$(git rev-parse --short HEAD)" > $(results.revision-short.path)
 
-        # verify if it's not a tag webhook event
-        if [[ $ref == *"refs/tags/"* ]]; then
-          echo "This is a tag commit. Not building."
-          exit 1
-        fi
-
-        if [ "$revisionType" == "release" ] || [ "$revisionType" = "hotfix" ] || [ "$revisionType" = "patch" ] || [ "$revisionType" == "feature" ] || [ "$revisionType" = "develop" ]; then
-          exit 0
-        else
-          echo "Branch $revisionType is not supported as part of git flow implementation"
-          exit 1
-        fi
-
-      {{- if $repo.tasks.validate.tagExists }}
+      {{- if not $repo.tasks.validate.ignoreTags }}
         git fetch --all --tags > /dev/null 2>&1
         if git rev-parse -q --verify "refs/tags/$revisionName" >/dev/null; then
-            echo "Tag $revisionName already exists"
+            echo "Tag $revisionName already exists (repo {{ $repo.id }})"
             exit 1
         fi
       {{- end }}
 
       {{- if $repo.tasks.validate.fileExists }}
-        ls -ls
         {{- range $i, $file := $repo.tasks.validate.fileExists }}
         file{{ $i }}={{ $repo.tasks.build.context }}/{{ $file }}
         if [ ! -f $file{{ $i }} ]; then
-            echo "Missing $file{{ $i }}"
-            exit 1 
+          echo "Missing $file{{ $i }}"
+          exit 1
+        else
+          echo "OK $file{{ $i }}"
         fi
         {{- end }}
       {{- end }}
@@ -304,12 +298,10 @@ spec:
             exit 1
           fi
         else
-          echo "Skipping npm version upgrade since we are in a $(cat /tekton/results/revision-type) branch"
+          echo "Skipping npm version upgrade since we are in a $(cat /tekton/results/revision-type) branch (repo {{ $repo.id }})"
           exit 0
         fi
       {{- end }}
-
-        echo OK
       securityContext:
         runAsUser: 0
 

@@ -35,16 +35,16 @@ spec:
   steps:
 
     - name: image-command
-      image: $(inputs.params.runtime)
-      workingDir: /workspace/source/$(inputs.params.context)
+      image: $(params.runtime)
+      workingDir: /workspace/source/$(params.context)
       resources: {}
       script: |
         #!/bin/sh
-        command=$(echo -e $(inputs.params.command))
+        command=$(echo -e $(params.command))
         if [ "$command" == "false" ]; then
           echo Not specified
         else
-        echo Executing $command
+          echo Executing $command
           $(inputs.params.command)
         fi
       securityContext:
