@@ -1,0 +1,53 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: github
+  namespace: {{ .Values.application.environments.cicd }}
+spec:
+  params:
+    - name: status
+      type: string
+    - name: repofullname
+      type: string
+    - name: revision
+      type: string
+    - name: repourl
+      type: string
+  steps:
+    - name: update-github
+      image: registry.access.redhat.com/ubi8/ubi:latest
+      env:
+        - name: GITHUBTOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.pipeline.webhook.github.secret }}
+              key: password
+      script: |
+        #!/usr/libexec/platform-python
+        import json
+        import os
+        import http.client
+        status_url = """/repos/$(params.repofullname)/statuses/$(params.revision)"""
+
+        data = {
+            "state": "$(params.status)",
+            "target_url": "https://replaceme",
+            "description": "Building",
+            "context": "tekton"
+        }
+        conn = http.client.HTTPSConnection("api.github.com")
+        r = conn.request(
+            "POST",
+            status_url.rstrip("\n"),
+            body=json.dumps(data),
+            headers={
+                "User-Agent": "TektonCD, the peaceful cat",
+                "Authorization": "Bearer " + os.environ["GITHUBTOKEN"],
+            })
+        resp = conn.getresponse()
+        if not str(resp.status).startswith("2"):
+            print("Error: %d" % (resp.status))
+            print(resp.read())
+            # sys.exit(resp.read())
+        else:
+          print("GitHub status '$(params.status)' has been set")

@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: apply
+  namespace: {{ .Values.application.environments.cicd }}
+spec:
+  workspaces:
+  - name: source
+  - name: shared
+  steps:
+    - name: helm-apply
+      image: registry.redhat.io/openshift4/ose-cli:latest
+      resources: {}
+      workingDir: /workspace/source/{{ .Values.pipeline.build.s2i.context }}
+      script: |
+        #!/bin/sh
+        if [ -d "chart" ]; then
+          /workspace/shared/helm template -f chart/values.yaml chart | oc apply -f-
+        else
+          echo "Chart does not exist"
+          exit 0
+        fi
+      securityContext:
+        runAsUser: 0
