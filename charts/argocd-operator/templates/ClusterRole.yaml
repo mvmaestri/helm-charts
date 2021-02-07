@@ -7,6 +7,9 @@ metadata:
     app.kubernetes.io/component: application-controller
     app.kubernetes.io/name: {{ .Values.namespace }}-argocd-application-controller
     app.kubernetes.io/part-of: {{ .Values.namespace }}
+    app.kubernetes.io/managed-by: Helm
+    meta.helm.sh/release-name: {{ .Chart.Name }}
+    meta.helm.sh/release-namespace: {{ .Values.namespace }}
   name: {{ .Values.namespace }}-argocd-application-controller
 rules:
 - apiGroups:
